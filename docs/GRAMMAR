@@ -1,0 +1,114 @@
+In this document, nonterminals are indicated by capitalized names (e.g.
+Nonterminal), and terminals/tokens by their string representation (e.g. var or
++) or a name in angle brackets (e.g. <id>). Angle-bracket tokens are described
+in terms of regular expressions (e.g. /[id][a-z]/). The symbols ":=" and "|"
+are used as part of the grammar itself, and are not part of the language (i.e.,
+they are not terminals). The starting nonterminal is Top.
+
+Strings have no \ escape sequences, but may use two quotes immediately in a row
+as an escape for quote. e.g.:
+
+"I told the language, ""Compile!"" It obeyed."
+
+The input is interpreted as octets. Values less than 0x80 are interpreted as
+ASCII. Higher values are only allowed as part of identifiers. As described in
+this document, there exists ambiguity between keywords and identifiers. This
+ambiguity is always resolved in favor of keywords.
+
+Tokenization is greedy, with space (\x20), tab (\x09), newline (\x0A) and
+carriage return (\x0D) acting as whitespace.
+
+
+<nil>           := //
+
+<id>            := /[a-zA-Z\x80-\xFF][a-zA-Z0-9\x80-\xFF]*/
+
+<num>           := /[0-9]+/
+
+<str>           := /("[^"]*")+/
+
+<intrinsic>     := /\$[a-zA-Z0-9]+/
+
+Top             := Decls
+
+Decls           := Decl Decls
+                 | <nil>
+
+Decl            := FunDecl
+                 | VarDecl
+
+FunDecl         := function <id> ( Params ) { Statements }
+
+VarDecl         := var <id> ;
+
+Params          := ParamList
+                 | <nil>
+
+ParamList       := Param , ParamList
+                 | Param
+
+Statements      := Statement ; Statements
+                 | <nil>
+
+Statement       := VarDecl
+                 | Expression
+
+Expression      := LVal = Expression
+                 | CondExpr
+
+CondExpr        := if ( Expression ) { Statements } ElseCase
+                 | while ( Expression ) { Statements }
+                 | OrExp
+
+ElseCase        := else { Statements }
+                 | <nil>
+
+OrExp           := OrExp || AndExp
+                 | AndExp
+
+AndExp          := AndExp && EqExp
+                 | EqExp
+
+EqExp           := ExExp == RelExp
+                 | RelExp
+
+RelExp          := RelExp < AddExp
+                 | RelExp > AddExp
+                 | RelExp <= AddExp
+                 | RelExp >= AddExp
+                 | AddExp
+
+AddExp          := AddExp + MulExp
+                 | AddExp - MulExp
+                 | AddExp ~ MulExp
+                 | MulExp
+
+MulExp          := MulExp * PostfixExp
+                 | MulExp / PostfixExp
+                 | MulExp % PostfixExp
+                 | PostfixExp
+
+PostfixExp      := <id> ( ArgList )
+                 | <intrinsic> ( ArgList )
+                 | PostfixExp [ Expression ]
+                 | PostfixExp . <id>
+                 | Primary
+
+LVal            := PostfixExp [ Expression ]
+                 | PostfixExp . <id>
+                 | <id>
+                 | ( LVal )
+
+Args            := ArgList
+                 | <nil>
+
+ArgList         := Arg , ArgList
+                 | Arg
+
+Arg             := Expression
+
+Primary         := <id>
+                 | <num>
+                 | <str>
+                 | { }
+                 | ( Expression )
