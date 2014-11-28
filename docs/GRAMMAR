@@ -1,3 +1,5 @@
+The grammar for SDyn is intended to be a subset of JavaScript.
+
 In this document, nonterminals are indicated by capitalized names (e.g.
 Nonterminal), and terminals/tokens by their string representation (e.g. var or
 +) or a name in angle brackets (e.g. <id>). Angle-bracket tokens are described
@@ -5,29 +7,36 @@ in terms of regular expressions (e.g. /[id][a-z]/). The symbols ":=" and "|"
 are used as part of the grammar itself, and are not part of the language (i.e.,
 they are not terminals). The starting nonterminal is Top.
 
-Strings have no \ escape sequences, but may use two quotes immediately in a row
-as an escape for quote. e.g.:
-
-"I told the language, ""Compile!"" It obeyed."
-
-The input is interpreted as octets. Values less than 0x80 are interpreted as
-ASCII. Higher values are only allowed as part of identifiers. As described in
-this document, there exists ambiguity between keywords and identifiers. This
-ambiguity is always resolved in favor of keywords.
+The input is interpreted as ASCII octets. As described in this document, there
+exists ambiguity between keywords and identifiers. This ambiguity is always
+resolved in favor of keywords.
 
 Tokenization is greedy, with space (\x20), tab (\x09), newline (\x0A) and
 carriage return (\x0D) acting as whitespace.
 
 
+Keyword         := else
+                 | false
+                 | function
+                 | if
+                 | null
+                 | return
+                 | true
+                 | typeof
+                 | var
+                 | while
+
+
 <nil>           := //
 
-<id>            := /[a-zA-Z\x80-\xFF][a-zA-Z0-9\x80-\xFF]*/
+<id>            := /[a-zA-Z][a-zA-Z0-9]*/
 
-<num>           := /[0-9]+/
+<num>           := /[1-9][0-9]*/
 
-<str>           := /("[^"]*")+/
+<str>           := /"([^"\\]*(\\.)*)*"/
 
 <intrinsic>     := /\$[a-zA-Z0-9]+/
+
 
 Top             := Decls
 
@@ -36,8 +45,12 @@ Decls           := Decl Decls
 
 Decl            := FunDecl
                  | VarDecl
+                 | <id> ( ) ;
 
-FunDecl         := function <id> ( Params ) { Statements }
+FunDecl         := function <id> ( Params ) { VarDecls Statements }
+
+VarDecls        := VarDecl VarDecls
+                 | <nil>
 
 VarDecl         := var <id> ;
 
@@ -47,21 +60,19 @@ Params          := ParamList
 ParamList       := Param , ParamList
                  | Param
 
-Statements      := Statement ; Statements
+Statements      := Statement Statements
                  | <nil>
 
-Statement       := VarDecl
-                 | Expression
+Statement       := if ( Expression ) { Statements } ElseClause
+                 | while ( Expression ) { Statements }
+                 | return Expression ;
+                 | Expression ;
+
+ElseClause      := else { Statements }
+                 | <nil>
 
 Expression      := LVal = Expression
-                 | CondExpr
-
-CondExpr        := if ( Expression ) { Statements } ElseCase
-                 | while ( Expression ) { Statements }
                  | OrExp
-
-ElseCase        := else { Statements }
-                 | <nil>
 
 OrExp           := OrExp || AndExp
                  | AndExp
@@ -69,7 +80,8 @@ OrExp           := OrExp || AndExp
 AndExp          := AndExp && EqExp
                  | EqExp
 
-EqExp           := ExExp == RelExp
+EqExp           := EqExp == RelExp
+                 | EqExp != RelExp
                  | RelExp
 
 RelExp          := RelExp < AddExp
@@ -80,18 +92,20 @@ RelExp          := RelExp < AddExp
 
 AddExp          := AddExp + MulExp
                  | AddExp - MulExp
-                 | AddExp ~ MulExp
                  | MulExp
 
 MulExp          := MulExp * PostfixExp
-                 | MulExp / PostfixExp
                  | MulExp % PostfixExp
+                 | PrefixExp
+
+PrefixExp       := ~ ~ ( MulExp / PrefixExp )
+                 | typeof PrefixExp
                  | PostfixExp
 
-PostfixExp      := <id> ( ArgList )
-                 | <intrinsic> ( ArgList )
+PostfixExp      := PostfixExp ( ArgList )
                  | PostfixExp [ Expression ]
                  | PostfixExp . <id>
+                 | <intrinsic> ( ArgList )
                  | Primary
 
 LVal            := PostfixExp [ Expression ]
@@ -110,5 +124,7 @@ Arg             := Expression
 Primary         := <id>
                  | <num>
                  | <str>
+                 | false
+                 | true
                  | { }
                  | ( Expression )

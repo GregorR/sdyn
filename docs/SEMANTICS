@@ -1,0 +1,376 @@
+Values may be of one of 6 types:
+ * undefined
+ * boolean
+ * number
+ * string
+ * object
+ * function
+
+The type 'undefined' has only one value, 'undefined'. The global scope
+initially has a single variable, named 'undefined', the value of which is
+'undefined'.
+
+The type 'boolean' has only two members: false and true.
+
+The type 'number' is an implementation-defined integer numeric type. Please
+note that this differs from JavaScript, which specifies numbers are 64-bit
+floating point.
+
+A value of type 'string' is an immutable sequence of ASCII characters. Please
+note that this differs from JavaScript, which specifies strings as Unicode.
+
+A value of type 'object' is a hash table mapping string names to values of any
+type. JavaScript's prototypes are not supported.
+
+A value of type 'function' is a reference to a piece of code defined by the
+grammar rule 'FunDecl := function ( ParamList ) { Statements }'. Please note
+that unlike JavaScript, functions in SDyn may not additionally have members and
+do not act as objects.
+
+The global scope is an object and may be extended at runtime.
+
+When a file is evaluated, its global function and variable declarations
+(FunDecls and VarDecls) are evaluated, filling the global scope. Then, any
+global calls (<id> ( ) ; ) are evaluated in the order that they appear. Global
+calls may only be to functions with no parameters. Multiple declarations in the
+global scope are allowed. The latest FunDecl is used. If a variable is declared
+with VarDecl and there are no corresponding FunDecls, its value is 'undefined'.
+Because FunDecls are the only way to declare functions, initially the only way
+to obtain a value of type function is to access a function-bound member of the
+global scope.
+
+Each function has a local scope. The variables in this scope are those declared
+in the VarDecls of the function, as well as the parameters. The parameters are
+initialized to the corresponding arguments passed while calling the function.
+If fewer arguments were passed then are required, the remaining parameters are
+initialized to 'undefined'. All other local variables are also initialized to
+'undefined'.
+
+Statements are executed in the order they appear in the source.
+
+The following coercions are built into the language, and will be used to
+describe certain statements:
+
+    ToBoolean(x):
+        if x is undefined:
+            false
+        else if x is number:
+            false if (x == 0), else true
+        else if x is string:
+            false if (x == ""), else true
+        else
+            true
+
+    ToNumber(x):
+        if x is undefined:
+            0
+        else if x is boolean:
+            1 if (x == true), else 0
+        else if x is string:
+            The string is interpreted as a base-10 number. If there are no
+            digits at the beginning of the string, the value is 0. If there are
+            characters after the sequence of digits which begins the string,
+            they are discarded and the value is derived only from the digits.
+        else
+            0 (Note that this is different behavior from JavaScript)
+
+    ToString(x):
+        if x is undefined:
+            "undefined"
+        else if x is boolean:
+            "true" if (x == true), else false
+        else if x is number:
+            The number is converted to a base-10 string.
+        else if x is object:
+            "[object Object]"
+        else if x is function:
+            "[function]" (Note that this is different behavior from JavaScript)
+
+    ToValue(x):
+        if x is string or number:
+            x
+        else:
+            ToString(x)
+
+
+The remaining semantics are described in terms of the corresponding production
+rules. In all cases in which the right hand side of a production is a single
+nonterminal, the evaluation rule is to simply evaluate the right-hand
+nonterminal.
+
+
+Statement := if ( Expression ) { Statements } ElseClause
+
+    1. Expression is evaluated as 'val'.
+    2. If ToBoolean(val) is true, then Statements are executed.
+    3. If ToBoolean(val) is false, and ElseClause is not <nil>, then
+       ElseClause.Statements are executed.
+
+
+Statement := while ( Expression ) { Statements }
+
+    1. Expression is evaluated as 'val'.
+    2. If ToBoolean(val) is true, then Statements are executed and repeat from
+       1.
+
+
+Statement := return Expression ;
+
+    1. Expression is evaluated as 'val'.
+    2. The currently executing function is terminated.
+    3. If the function was called by the rules
+       'PostfixExp1 := PostfixExp2 ( ArgList )', then PostfixExp1 evaluates to
+       val.
+
+
+Statement := Expression ;
+
+    1. Expression is evaluated.
+
+
+Expression1 := LVal = Expression2
+
+    1. If LVal is of the form 'LVal := PostfixExp [ Expression ]':
+       a. PostfixExp is evaluated as 'obj'.
+       b. Expression is evaluated as 'idx'.
+       c. Expression2 is evaluated as 'val'.
+       d. If obj is of type object:
+          i. If obj has a member named ToString(idx), its value is replaced
+             with val.
+          ii. If obj does not have a member named ToString(idx), it is added,
+             with value val.
+       e. If obj is of type undefined, execution is terminated and an error
+          message is displayed.
+       f. Expression1 evaluates to val.
+
+    2. If LVal is of the form 'LVal := PostfixExp . <id>':
+       a. PostfixExp is evaluated as 'obj'.
+       b. Expression2 is evaluated as 'val'.
+       c. If obj is of type object:
+          i. If obj has a member named <id>, its value is replaced with val.
+          ii. If obj does not have a member named <id>, it is added, with value val.
+       d. If obj is of type undefined, execution is terminated and an error
+          message is displayed.
+       e. Expression1 evaluates to val.
+
+    3. If LVal is of the form 'LVal := <id>':
+       a. Expression2 is evaluated as 'val'.
+       b. If <id> is a variable present in the local symbol table, its value is
+          replaced with val.
+       c. If <id> is not present in the local symbol table, and is not 'undefined':
+          i. If the global object has a member named <id>, its value is
+             replaced with val.
+          ii. If the global object does not have a member named <id>, it is
+             added, with value val.
+       d. Expression1 evaluates to val.
+
+    4. If LVal is of the form 'LVal := ( LVal )', then Expression1 is evaluated
+       with LVal replaced by LVal.LVal.
+
+
+OrExp1 := OrExp2 || AndExp
+
+    1. OrExp2 is evaluated as 'l'.
+    2. If ToBoolean(l) is true, then OrExp1 evaluates to l.
+    3. Else:
+       a. AndExp is evaluated as 'r'.
+       b. OrExp1 evaluates to r.
+
+
+AndExp1 := AndExp2 && EqExp
+
+    1. AndExp2 is evaluated as 'l'.
+    2. If ToBoolean(l) is false, then AndExp1 evaluates to l.
+    3. Else:
+       a. EqExp is evaluated as 'r'.
+       b. AndExp1 evaluates to r.
+
+
+EqExp1 := EqExp2 == RelExp
+
+    1. EqExp2 is evaluated as 'l'.
+    2. RelExp is evaluated as 'r'.
+    3. If l and r are not of the same type, then l is replaced by ToValue(l)
+       and r is replaced by ToValue(r).
+    4. If l is the same value as r, then EqExp1 evaluates to true.
+    5. Else EqExp1 evaluates to false.
+
+
+EqExp1 := EqExp2 != RelExp
+
+    Inverse of 'EqExp1 := EqExp2 == RelExp'.
+
+
+RelExp1 := RelExp2 < AddExp
+
+    1. RelExp2 is evaluated as 'l'.
+    2. AddExp is evaluated as 'r'.
+    3. If ToNumber(l) is less than ToNumber(r), then RelExp1 evaluates to true.
+    4. Else EqExp1 evaluates to false.
+
+
+RelExp1 := RelExp2 > AddExp
+
+    Same as 'RelExp1 := RelExp2 < AddExp', with "is less than" replaced by "is
+    greater than".
+
+
+RelExp1 := RelExp2 <= AddExp
+
+    Same as 'RelExp1 := RelExp2 < AddExp', with "is less than" replaced by "is
+    less than or equal to".
+
+
+RelExp1 := RelExp2 >= AddExp
+
+    Same as 'RelExp1 := RelExp2 < AddExp', with "is less than" replaced by "is
+    greater than or equal to".
+
+
+AddExp1 := AddExp2 + MulExp
+
+    1. AddExp2 is evaluated as 'l'.
+    2. MulExp is evaluated as 'r'.
+    3. If l and r are both numbers, then AddExp1 evaluates to their sum.
+    4. Else, AddExp1 evaluates to the concatenation of ToString(l) and ToString(r)
+
+
+AddExp1 := AddExp2 - MulExp
+
+    1. AddExp2 is evaluated as 'l'.
+    2. MulExp is evaluated as 'r'.
+    3. AddExp1 evaluates to ToNumber(l) minus ToNumber(r).
+
+
+MulExp1 := MulExp2 * PostfixExp
+
+    1. MulExp2 is evaluated as 'l'.
+    2. PostfixExp is evaluated as 'r'.
+    3. MulExp1 evaluates to ToNumber(l) times ToNumber(r).
+
+
+MulExp1 := MulExp2 % PostfixExp
+
+    1. MulExp2 is evaluated as 'l'.
+    2. PostfixExp is evaluated as 'r'.
+    3. MulExp1 evaluates to the remainder after division of ToNumber(l) by
+       ToNumber(r).
+
+
+PrefixExp1 := ~ ~ ( MulExp / PrefixExp2 )
+
+    1. MulExp is evaluated as 'l'.
+    2. PrefixExp2 is evaluated as 'r'.
+    3. PrefixExp1 evaluates to ToNumber(l) divided by ToNumber(r), with its
+       fractional part truncated (i.e., the closest integer on the number line
+       in the direction of 0).
+
+
+PrefixExp1 := typeof PrefixExp2
+
+    1. PrefixExp2 is evaluated as 'val'.
+    2. PrefixExp1 evaluates to a string corresponding to the type of val
+       (i.e., "undefined", "boolean", "number", "string", "object" or
+       "function").
+
+
+PostfixExp1 := PostfixExp2 ( ArgList )
+
+    1. PostfixExp2 is evaluated as 'fun'.
+    2. If fun is not of type function, execution is terminated and an error
+       message is displayed.
+    3. Each Arg (Arg_1..Arg_n) is evaluated as values 'val_1'..'val_n'.
+    4. A local scope is established for fun, with each parameter Param_n
+       initialized to the value val_n, and all other local variables
+       initialized to undefined.
+    5. fun's Statements are executed.
+    6. If fun did not explicitly return (see rule
+       'Statement := return Expression ;'), then PostfixExp1 evaluates to
+       undefined.
+
+
+PostfixExp1 := PostfixExp2 [ Expression ]
+
+    1. PostfixExp2 is evaluated as 'obj'.
+
+    2. Expression is evaluated as 'idx'.
+
+    3. If obj is of type object:
+       a. If obj has a member of name ToString(idx), PostfixExp1 evaluates to
+          the value of that member.
+       b. Else, PostfixExp1 evaluates to undefined.
+
+    4. Else if obj is of type undefined, execution is terminated and an error
+       message is displayed.
+
+    5. Else, PostfixExp1 evaluates to undefined.
+
+
+PostfixExp1 := PostfixExp2 . <id>
+
+    1. PostfixExp2 is evaluated as 'obj'.
+
+    2. If obj is of type object:
+       a. If obj has a member of name <id>, PostfixExp1 evaluates to the value
+          of that member.
+       b. Else, PostfixExp1 evaluates to undefined.
+
+    3. Else if obj is of type undefined, execution is terminated and an error
+       message is displayed.
+
+    4. Else, PostfixExp1 evaluates to undefined.
+
+
+PostfixExp := <intrinsic> ( ArgList )
+
+    An intrinsic function is called. The behavior is implementation-defined.
+
+
+Primary := <id>
+
+    1. If <id> is a variable present in the local symbol table, Primary
+       evaluates to that variable's value.
+    2. Else if the global object has a member of name <id>, Primary evaluates to
+       its value.
+    3. Else, execution is terminated an an error message is displayed.
+
+
+Primary := <num>
+
+    Evaluates to the value of <num> interpreted as a base-10 integer.
+
+
+Primary := <str>
+
+    Evaluates to a string. Each character in <str>, excluding the opening and
+    closing quotation marks, is interpreted as a single character in the
+    resulting string, with the exception of \, which begins an escape sequence:
+
+    \\: Backslash (\)
+    \n: Newline (\x0A)
+    \r: Carriage return (\x0D)
+    \": Quotation mark
+
+    All other escape sequences are interpreted literally, with the initial \
+    removed.
+
+
+Primary := false
+
+    Evaluates to false.
+
+
+Primary := true
+
+    Evaluates to true.
+
+
+Primary := { }
+
+    Evaluates to a new object with no members (i.e., an empty hash table).
+
+
+Primary := ( Expression )
+
+    1. Expression is evaluated as 'val'.
+    2. Primary evaluates to val.
