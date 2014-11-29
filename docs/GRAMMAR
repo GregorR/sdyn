@@ -60,6 +60,8 @@ Params          := ParamList
 ParamList       := Param , ParamList
                  | Param
 
+Param           := <id>
+
 Statements      := Statement Statements
                  | <nil>
 
@@ -103,10 +105,10 @@ PrefixExp       := ~ ~ ( MulExp / PrefixExp )
                  | typeof PrefixExp
                  | PostfixExp
 
-PostfixExp      := PostfixExp ( ArgList )
+PostfixExp      := PostfixExp ( Args )
                  | PostfixExp [ Expression ]
                  | PostfixExp . <id>
-                 | <intrinsic> ( ArgList )
+                 | <intrinsic> ( Args )
                  | Primary
 
 LVal            := PostfixExp [ Expression ]
