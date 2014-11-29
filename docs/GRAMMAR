@@ -99,6 +99,7 @@ MulExp          := MulExp * PostfixExp
                  | PrefixExp
 
 PrefixExp       := ~ ~ ( MulExp / PrefixExp )
+                 | ! PrefixExp
                  | typeof PrefixExp
                  | PostfixExp
 
