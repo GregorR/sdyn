@@ -25,9 +25,10 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
     }
     ret.val = inp;
 
-    /* is it an identifier? */
+    /* is it an identifier or intrinsic? */
     if ((*inp >= 'a' && *inp <= 'z') ||
-        (*inp >= 'A' && *inp <= 'Z')) {
+        (*inp >= 'A' && *inp <= 'Z') ||
+        (*inp == '$')) {
         size_t len;
 
         /* yes. Get the rest */
@@ -38,7 +39,7 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
              len++);
 
         /* set up the return */
-        ret.type = SDYN_TOKEN_ID;
+        ret.type = (*inp == '$') ? SDYN_TOKEN_INTRINSIC : SDYN_TOKEN_ID;
         ret.valLen = len;
 
         /* and special-case our keywords */

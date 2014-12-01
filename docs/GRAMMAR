@@ -96,8 +96,8 @@ AddExp          := AddExp + MulExp
                  | AddExp - MulExp
                  | MulExp
 
-MulExp          := MulExp * PostfixExp
-                 | MulExp % PostfixExp
+MulExp          := MulExp * PrefixExp
+                 | MulExp % PrefixExp
                  | PrefixExp
 
 PrefixExp       := ~ ~ ( MulExp / PrefixExp )
