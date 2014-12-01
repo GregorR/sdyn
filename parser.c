@@ -35,7 +35,6 @@
     ret->tok = (tokv); \
     GGC_W(ret, children, childrenv); \
 } while(0)
-static struct SDyn_Token errtok;
 
 /* a convenience type for lists */
 GGC_TYPE(SDyn_NodeListNode)
@@ -127,7 +126,7 @@ SDyn_Node sdyn_parse(const unsigned char *inp)
 
 PARSER(Top)
 {
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, first;
     SDyn_Node ret = NULL, cur = NULL;
     SDyn_NodeArray children = NULL;
     SDyn_NodeList clist = NULL;
@@ -135,6 +134,8 @@ PARSER(Top)
     GGC_PUSH_4(ret, cur, children, clist);
 
     clist = GGC_NEW(SDyn_NodeList);
+    PEEK();
+    first = tok;
 
     while (1) {
         PEEK();
@@ -154,7 +155,7 @@ PARSER(Top)
 
     /* now build the return */
     children = listToArray(clist);
-    RET(TOP, errtok, children);
+    RET(TOP, first, children);
     return ret;
 }
 
@@ -208,11 +209,14 @@ PARSER(VarDecls)
     SDyn_Node ret = NULL, cur = NULL;
     SDyn_NodeArray children = NULL;
     SDyn_NodeList clist = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, first;
 
     GGC_PUSH_4(ret, cur, children, clist);
 
     clist = GGC_NEW(SDyn_NodeList);
+    PEEK();
+    first = tok;
+
     while (1) {
         PEEK();
         IFNOTTOK(var) break;
@@ -221,7 +225,7 @@ PARSER(VarDecls)
     }
 
     children = listToArray(clist);
-    RET(VARDECLS, errtok, children);
+    RET(VARDECLS, first, children);
     return ret;
 }
 
@@ -246,14 +250,15 @@ PARSER(Params)
     SDyn_Node ret = NULL;
     SDyn_NodeArray children = NULL;
     SDyn_NodeList clist = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, first;
 
     GGC_PUSH_3(ret, children, clist);
 
     clist = GGC_NEW(SDyn_NodeList);
+    PEEK();
+    first = tok;
 
     /* do we have at least one? */
-    PEEK();
     IFTOK(ID) {
         NEXT();
 
@@ -276,7 +281,7 @@ PARSER(Params)
 
     /* and prepare the return */
     children = listToArray(clist);
-    RET(PARAMS, errtok, children);
+    RET(PARAMS, first, children);
     return ret;
 }
 
@@ -285,11 +290,13 @@ PARSER(Statements)
     SDyn_Node ret = NULL;
     SDyn_NodeArray children = NULL;
     SDyn_NodeList clist = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, first;
 
     GGC_PUSH_3(ret, children, clist);
 
     clist = GGC_NEW(SDyn_NodeList);
+    PEEK();
+    first = tok;
 
     while (1) {
         /* the only token that cannot be a statement is } */
@@ -300,7 +307,7 @@ PARSER(Statements)
     }
 
     children = listToArray(clist);
-    RET(STATEMENTS, errtok, children);
+    RET(STATEMENTS, first, children);
     return ret;
 }
 
@@ -308,7 +315,7 @@ PARSER(Statement)
 {
     SDyn_Node ret = NULL;
     SDyn_NodeArray children = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, rep;
 
     GGC_PUSH_2(ret, children);
 
@@ -318,6 +325,7 @@ PARSER(Statement)
         NEXT();
 
         /* if statement */
+        rep = tok;
         children = GGC_NEW_PA(SDyn_Node, 3);
         ASSERTNEXT(LPAREN);
         ret = parseExpression(ntok);
@@ -328,13 +336,14 @@ PARSER(Statement)
         GGC_WA(children, 1, ret);
         ret = parseElseClause(ntok);
         GGC_WA(children, 2, ret);
-        RET(IF, errtok, children);
+        RET(IF, rep, children);
         return ret;
 
     } else IFTOK(while) {
         NEXT();
 
         /* while statement */
+        rep = tok;
         children = GGC_NEW_PA(SDyn_Node, 2);
         ASSERTNEXT(LPAREN);
         ret = parseExpression(ntok);
@@ -344,18 +353,19 @@ PARSER(Statement)
         ret = parseStatements(ntok);
         GGC_WA(children, 1, ret);
         ASSERTNEXT(RBRACE);
-        RET(WHILE, errtok, children);
+        RET(WHILE, rep, children);
         return ret;
 
     } else IFTOK(return) {
         NEXT();
 
         /* return statement */
+        rep = tok;
         children = GGC_NEW_PA(SDyn_Node, 1);
         ret = parseExpression(ntok);
         GGC_WA(children, 0, ret);
         ASSERTNEXT(SEMICOLON);
-        RET(RETURN, errtok, children);
+        RET(RETURN, rep, children);
         return ret;
 
     } else {
@@ -389,7 +399,7 @@ PARSER(Expression)
 {
     SDyn_Node ret = NULL, left = NULL, right = NULL;
     SDyn_NodeArray children = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, rep;
 
     GGC_PUSH_4(ret, left, right, children);
 
@@ -400,11 +410,12 @@ PARSER(Expression)
         IFTOK(ASSIGN) {
             /* it is */
             NEXT();
+            rep = tok;
             right = parseExpression(ntok);
             children = GGC_NEW_PA(SDyn_Node, 2);
             GGC_WA(children, 0, left);
             GGC_WA(children, 1, right);
-            RET(ASSIGN, errtok, children);
+            RET(ASSIGN, rep, children);
             return ret;
 
         } else {
@@ -424,7 +435,7 @@ PARSER(Expression)
 PARSER(name) { \
     SDyn_Node ret = NULL, right = NULL; \
     SDyn_NodeArray children = NULL; \
-    struct SDyn_Token tok; \
+    struct SDyn_Token tok, rep; \
     GGC_PUSH_3(ret, right, children); \
     ret = parse ## sub(ntok); \
     while (1) { \
@@ -433,11 +444,12 @@ PARSER(name) { \
 #define BINARY(ttype, ntype, sub) \
     IFTOK(ttype) { \
         NEXT(); \
+        rep = tok; \
         right = parse ## sub(ntok); \
         children = GGC_NEW_PA(SDyn_Node, 2); \
         GGC_WA(children, 0, ret); \
         GGC_WA(children, 1, right); \
-        RET(ntype, errtok, children); \
+        RET(ntype, rep, children); \
     } else
 
 #define BINARY_TAIL \
@@ -480,7 +492,7 @@ PARSER(PrefixExp)
 {
     SDyn_Node ret = NULL, left = NULL, right = NULL;
     SDyn_NodeArray children = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, rep;
 
     GGC_PUSH_4(ret, left, right, children);
 
@@ -493,6 +505,7 @@ PARSER(PrefixExp)
         ASSERTNEXT(LPAREN);
         left = parseMulExp(ntok);
         ASSERTNEXT(DIV);
+        rep = tok;
         right = parsePrefixExp(ntok);
         ASSERTNEXT(RPAREN);
 
@@ -500,27 +513,29 @@ PARSER(PrefixExp)
         GGC_WA(children, 0, left);
         GGC_WA(children, 1, right);
 
-        RET(DIV, errtok, children);
+        RET(DIV, rep, children);
         return ret;
 
     } else IFTOK(NOT) {
         NEXT();
 
         /* ! PrefixExp */
+        rep = tok;
         ret = parsePrefixExp(ntok);
         children = GGC_NEW_PA(SDyn_Node, 1);
         GGC_WA(children, 0, ret);
-        RET(NOT, errtok, children);
+        RET(NOT, rep, children);
         return ret;
 
     } else IFTOK(typeof) {
         NEXT();
 
         /* typeof PrefixExp */
+        rep = tok;
         ret = parsePrefixExp(ntok);
         children = GGC_NEW_PA(SDyn_Node, 1);
         GGC_WA(children, 0, ret);
-        RET(TYPEOF, errtok, children);
+        RET(TYPEOF, rep, children);
         return ret;
 
     }
@@ -532,7 +547,7 @@ PARSER(PostfixExp)
 {
     SDyn_Node ret = NULL, right = NULL;
     SDyn_NodeArray children = NULL;
-    struct SDyn_Token tok, id;
+    struct SDyn_Token tok, id, rep;
 
     GGC_PUSH_3(ret, right, children);
 
@@ -564,23 +579,25 @@ PARSER(PostfixExp)
             NEXT();
 
             /* PostfixExp ( Args ) */
+            rep = tok;
             right = parseArgs(ntok);
             ASSERTNEXT(RPAREN);
             children = GGC_NEW_PA(SDyn_Node, 2);
             GGC_WA(children, 0, ret);
             GGC_WA(children, 1, right);
-            RET(CALL, errtok, children);
+            RET(CALL, rep, children);
 
         } else IFTOK(LBRACKET) {
             NEXT();
 
             /* PostfixExp [ Expression ] */
+            rep = tok;
             right = parseExpression(ntok);
             ASSERTNEXT(RBRACKET);
             children = GGC_NEW_PA(SDyn_Node, 2);
             GGC_WA(children, 0, ret);
             GGC_WA(children, 1, right);
-            RET(INDEX, errtok, children);
+            RET(INDEX, rep, children);
 
         } else IFTOK(DOT) {
             NEXT();
@@ -628,15 +645,16 @@ PARSER(Args)
     SDyn_Node ret = NULL, cur = NULL;
     SDyn_NodeArray children = NULL;
     SDyn_NodeList clist = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, first;
 
     GGC_PUSH_4(ret, cur, children, clist);
 
     /* if it's just a ), no args at all */
     PEEK();
+    first = tok;
     IFTOK(RPAREN) {
         children = GGC_NEW_PA(SDyn_Node, 0);
-        RET(ARGS, errtok, children);
+        RET(ARGS, first, children);
         return ret;
     }
 
@@ -656,7 +674,7 @@ PARSER(Args)
     }
 
     children = listToArray(clist);
-    RET(ARGS, errtok, children);
+    RET(ARGS, first, children);
 
     return ret;
 }
@@ -664,7 +682,7 @@ PARSER(Args)
 PARSER(Primary)
 {
     SDyn_Node ret = NULL;
-    struct SDyn_Token tok;
+    struct SDyn_Token tok, rep;
 
     GGC_PUSH_1(ret);
 
@@ -686,8 +704,9 @@ PARSER(Primary)
         RET(TRUE, tok, GGC_NULL);
         return ret;
     } else IFTOK(LBRACE) {
+        rep = tok;
         ASSERTNEXT(RBRACE);
-        RET(OBJ, errtok, GGC_NULL);
+        RET(OBJ, rep, GGC_NULL);
         return ret;
     } else IFTOK(LPAREN) {
         ret = parseExpression(ntok);
@@ -698,6 +717,27 @@ PARSER(Primary)
 
 #ifdef USE_SDYN_PARSER_TEST
 #include "buffer.h"
+
+static void dumpNode(size_t spcs, SDyn_Node node)
+{
+    SDyn_NodeArray children = NULL;
+    size_t i;
+
+    GGC_PUSH_2(node, children);
+
+    for (i = 0; i < spcs; i++) printf("  ");
+    printf("%.*s\n", node->tok.valLen, (char *) node->tok.val);
+
+    spcs++;
+    children = GGC_R(node, children);
+    if (children) {
+        for (i = 0; i < children->length; i++) {
+            dumpNode(spcs, GGC_RA(children, i));
+        }
+    }
+
+    return;
+}
 
 int main()
 {
@@ -713,8 +753,7 @@ int main()
     GGC_PUSH_1(node);
 
     node = sdyn_parse(cur);
-
-    printf("All is well.\n");
+    dumpNode(0, node);
 
     return 0;
 }
