@@ -43,6 +43,10 @@ enum SDyn_NodeType {
     SDYN_NODE_TRUE, /* - [] */
     SDYN_NODE_OBJ, /* - [] */
 
+    /* nodes for IR only */
+    SDYN_NODE_ALLOCA, /* allocate space on the stack */
+    SDYN_NODE_POPA, /* free space from the stack */
+
     SDYN_NODE_LAST
 };
 
