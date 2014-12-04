@@ -41,10 +41,12 @@ char *sdyn_nodeNames[] = {
 } while(0)
 
 #define RET(ttype, tokv, childrenv) do { \
+    struct SDyn_Token tokvw; \
     ret = GGC_NEW(SDyn_Node); \
-    ret->type = SDYN_NODE_ ## ttype; \
-    ret->tok = (tokv); \
-    GGC_W(ret, children, childrenv); \
+    GGC_WD(ret, type, SDYN_NODE_ ## ttype); \
+    tokvw = (tokv); \
+    GGC_WD(ret, tok, tokvw); \
+    GGC_WP(ret, children, childrenv); \
 } while(0)
 
 GGC_LIST_STATIC(SDyn_Node)
@@ -151,9 +153,9 @@ PARSER(FunDecl)
     ASSERTNEXT(RBRACE);
 
     children = GGC_NEW_PA(SDyn_Node, 3);
-    GGC_WA(children, 0, params);
-    GGC_WA(children, 1, varDecls);
-    GGC_WA(children, 2, statements);
+    GGC_WAP(children, 0, params);
+    GGC_WAP(children, 1, varDecls);
+    GGC_WAP(children, 2, statements);
     RET(FUNDECL, id, children);
 
     return ret;
@@ -284,13 +286,13 @@ PARSER(Statement)
         children = GGC_NEW_PA(SDyn_Node, 3);
         ASSERTNEXT(LPAREN);
         ret = parseExpression(ntok);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         ASSERTNEXT(RPAREN);
         ASSERTNEXT(LBRACE);
         ret = parseStatements(ntok);
-        GGC_WA(children, 1, ret);
+        GGC_WAP(children, 1, ret);
         ret = parseElseClause(ntok);
-        GGC_WA(children, 2, ret);
+        GGC_WAP(children, 2, ret);
         RET(IF, rep, children);
         return ret;
 
@@ -302,11 +304,11 @@ PARSER(Statement)
         children = GGC_NEW_PA(SDyn_Node, 2);
         ASSERTNEXT(LPAREN);
         ret = parseExpression(ntok);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         ASSERTNEXT(RPAREN);
         ASSERTNEXT(LBRACE);
         ret = parseStatements(ntok);
-        GGC_WA(children, 1, ret);
+        GGC_WAP(children, 1, ret);
         ASSERTNEXT(RBRACE);
         RET(WHILE, rep, children);
         return ret;
@@ -318,7 +320,7 @@ PARSER(Statement)
         rep = tok;
         children = GGC_NEW_PA(SDyn_Node, 1);
         ret = parseExpression(ntok);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         ASSERTNEXT(SEMICOLON);
         RET(RETURN, rep, children);
         return ret;
@@ -368,8 +370,8 @@ PARSER(Expression)
             rep = tok;
             right = parseExpression(ntok);
             children = GGC_NEW_PA(SDyn_Node, 2);
-            GGC_WA(children, 0, left);
-            GGC_WA(children, 1, right);
+            GGC_WAP(children, 0, left);
+            GGC_WAP(children, 1, right);
             RET(ASSIGN, rep, children);
             return ret;
 
@@ -402,8 +404,8 @@ PARSER(name) { \
         rep = tok; \
         right = parse ## sub(ntok); \
         children = GGC_NEW_PA(SDyn_Node, 2); \
-        GGC_WA(children, 0, ret); \
-        GGC_WA(children, 1, right); \
+        GGC_WAP(children, 0, ret); \
+        GGC_WAP(children, 1, right); \
         RET(ntype, rep, children); \
     } else
 
@@ -465,8 +467,8 @@ PARSER(PrefixExp)
         ASSERTNEXT(RPAREN);
 
         children = GGC_NEW_PA(SDyn_Node, 2);
-        GGC_WA(children, 0, left);
-        GGC_WA(children, 1, right);
+        GGC_WAP(children, 0, left);
+        GGC_WAP(children, 1, right);
 
         RET(DIV, rep, children);
         return ret;
@@ -478,7 +480,7 @@ PARSER(PrefixExp)
         rep = tok;
         ret = parsePrefixExp(ntok);
         children = GGC_NEW_PA(SDyn_Node, 1);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         RET(NOT, rep, children);
         return ret;
 
@@ -489,7 +491,7 @@ PARSER(PrefixExp)
         rep = tok;
         ret = parsePrefixExp(ntok);
         children = GGC_NEW_PA(SDyn_Node, 1);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         RET(TYPEOF, rep, children);
         return ret;
 
@@ -518,7 +520,7 @@ PARSER(PostfixExp)
         ret = parseArgs(ntok);
         ASSERTNEXT(RPAREN);
         children = GGC_NEW_PA(SDyn_Node, 1);
-        GGC_WA(children, 0, ret);
+        GGC_WAP(children, 0, ret);
         RET(INTRINSICCALL, id, children);
 
     } else {
@@ -538,8 +540,8 @@ PARSER(PostfixExp)
             right = parseArgs(ntok);
             ASSERTNEXT(RPAREN);
             children = GGC_NEW_PA(SDyn_Node, 2);
-            GGC_WA(children, 0, ret);
-            GGC_WA(children, 1, right);
+            GGC_WAP(children, 0, ret);
+            GGC_WAP(children, 1, right);
             RET(CALL, rep, children);
 
         } else IFTOK(LBRACKET) {
@@ -550,8 +552,8 @@ PARSER(PostfixExp)
             right = parseExpression(ntok);
             ASSERTNEXT(RBRACKET);
             children = GGC_NEW_PA(SDyn_Node, 2);
-            GGC_WA(children, 0, ret);
-            GGC_WA(children, 1, right);
+            GGC_WAP(children, 0, ret);
+            GGC_WAP(children, 1, right);
             RET(INDEX, rep, children);
 
         } else IFTOK(DOT) {
@@ -561,7 +563,7 @@ PARSER(PostfixExp)
             ASSERTNEXT(ID);
             id = tok;
             children = GGC_NEW_PA(SDyn_Node, 1);
-            GGC_WA(children, 0, ret);
+            GGC_WAP(children, 0, ret);
             RET(MEMBER, id, children);
 
         } else break;
@@ -575,6 +577,7 @@ PARSER(LValOpt)
 {
     SDyn_Node ret = NULL;
     struct SDyn_Token tok, start;
+    int type;
 
     GGC_PUSH_1(ret);
 
@@ -585,9 +588,10 @@ PARSER(LValOpt)
     ret = parseOrExp(ntok);
 
     /* check if it's a valid for */
-    if (ret->type == SDYN_NODE_INDEX ||
-        ret->type == SDYN_NODE_MEMBER ||
-        ret->type == SDYN_NODE_VARREF)
+    type = GGC_RD(ret, type);
+    if (type == SDYN_NODE_INDEX ||
+        type == SDYN_NODE_MEMBER ||
+        type == SDYN_NODE_VARREF)
         return ret;
 
     /* otherwise, discard */
@@ -681,13 +685,13 @@ static void dumpNode(size_t spcs, SDyn_Node node)
     GGC_PUSH_2(node, children);
 
     for (i = 0; i < spcs; i++) printf("  ");
-    printf("%s: %.*s\n", sdyn_nodeNames[node->type], node->tok.valLen, (char *) node->tok.val);
+    printf("%s: %.*s\n", sdyn_nodeNames[GGC_RD(node, type)], GGC_RD(node, tok).valLen, (char *) GGC_RD(node, tok).val);
 
     spcs++;
-    children = GGC_R(node, children);
+    children = GGC_RP(node, children);
     if (children) {
         for (i = 0; i < children->length; i++) {
-            dumpNode(spcs, GGC_RA(children, i));
+            dumpNode(spcs, GGC_RAP(children, i));
         }
     }
 

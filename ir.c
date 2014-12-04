@@ -24,11 +24,17 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
     GGC_PUSH_8(ir, node, symbols, children, cnode, irn, name, indexBox);
 
-    children = GGC_R(node, children);
+    children = GGC_RP(node, children);
 
-#define SUB(x) irCompileNode(ir, GGC_RA(children, x), symbols)
+#define SUB(x) irCompileNode(ir, GGC_RAP(children, x), symbols)
+#define IRNNEW() do { \
+    int irntype; \
+    irn = GGC_NEW(SDyn_IRNode); \
+    irntype = GGC_RD(node, type); \
+    GGC_WD(irn, op, irntype); \
+} while(0)
 
-    switch (node->type) {
+    switch (GGC_RD(node, type)) {
         case SDYN_NODE_TOP:
         case SDYN_NODE_GLOBALCALL:
             /* only for debugging purposes */
@@ -48,7 +54,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             /* our top level */
             /* make space for locals */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_ALLOCA;
+            GGC_WD(irn, op, SDYN_NODE_ALLOCA);
             SDyn_IRNodeListPush(ir, irn);
 
             SUB(0); /* params */
@@ -57,37 +63,38 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
             /* return undefined */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_NIL;
+            GGC_WD(irn, op, SDYN_NODE_NIL);
             SDyn_IRNodeListPush(ir, irn);
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_RETURN;
-            irn->left = ir->length - 1;
+            GGC_WD(irn, op, SDYN_NODE_RETURN);
+            i = GGC_RD(ir, length) - 1;
+            GGC_WD(irn, left, i);
             SDyn_IRNodeListPush(ir, irn);
 
             /* pop our space */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_POPA;
+            GGC_WD(irn, op, SDYN_NODE_POPA);
             SDyn_IRNodeListPush(ir, irn);
             break;
 
         case SDYN_NODE_PARAMS:
             /* simple list */
             for (i = 0; i < children->length; i++) {
-                cnode = GGC_RA(children, i);
+                cnode = GGC_RAP(children, i);
 
-                tok = cnode->tok;
+                tok = GGC_RD(cnode, tok);
                 name = sdyn_boxString((char *) tok.val, tok.valLen);
 
                 /* add it to the symbol table */
                 indexBox = GGC_NEW(GGC_size_t_Unit);
-                indexBox->v = ir->length;
+                i = GGC_RD(ir, length);
+                GGC_WD(indexBox, v, i);
                 SDyn_IndexMapPut(symbols, name, indexBox);
 
                 /* make the IR node */
-                irn = GGC_NEW(SDyn_IRNode);
-                irn->op = cnode->type;
-                irn->rtype = SDYN_TYPE_BOXED;
-                irn->imm = i;
+                IRNNEW();
+                GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+                GGC_WD(irn, imm, i);
 
                 /* add it to the list */
                 SDyn_IRNodeListPush(ir, irn);
@@ -95,18 +102,19 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         case SDYN_NODE_VARDECL:
-            tok = node->tok;
+            tok = GGC_RD(node, tok);
             name = sdyn_boxString((char *) tok.val, tok.valLen);
 
             /* add it to the symbol table */
             indexBox = GGC_NEW(GGC_size_t_Unit);
-            indexBox->v = ir->length;
+            i = GGC_RD(ir, length);
+            GGC_WD(indexBox, v, i);
             SDyn_IndexMapPut(symbols, name, indexBox);
 
             /* and make an IR node */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_NIL;
-            irn->rtype = SDYN_TYPE_UNDEFINED;
+            GGC_WD(irn, op, SDYN_NODE_NIL);
+            GGC_WD(irn, rtype, SDYN_TYPE_UNDEFINED);
 
             /* add it to the list */
             SDyn_IRNodeListPush(ir, irn);
@@ -114,23 +122,26 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_ASSIGN:
             /* what we do from here depends on the type of the LHS */
-            cnode = GGC_RA(children, 0);
-            switch (cnode->type) {
+            cnode = GGC_RAP(children, 0);
+            switch (GGC_RD(cnode, type)) {
                 case SDYN_NODE_INDEX:
                     irn = GGC_NEW(SDyn_IRNode);
-                    irn->op = SDYN_NODE_ASSIGNINDEX;
-                    irn->rtype = SDYN_TYPE_BOXED;
+                    GGC_WD(irn, op, SDYN_NODE_ASSIGNINDEX);
+                    GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
 
                     /* get the indexed object */
-                    children = GGC_R(cnode, children);
-                    irn->left = SUB(0);
+                    children = GGC_RP(cnode, children);
+                    i = SUB(0);
+                    GGC_WD(irn, left, i);
 
                     /* get the index itself */
-                    irn->right = SUB(1);
-                    children = GGC_R(node, children);
+                    i = SUB(1);
+                    GGC_WD(irn, right, i);
+                    children = GGC_RP(node, children);
 
                     /* get the value */
-                    irn->third = SUB(1);
+                    i = SUB(1);
+                    GGC_WD(irn, third, i);
 
                     /* and perform the assignment */
                     SDyn_IRNodeListPush(ir, irn);
@@ -139,21 +150,23 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
                 case SDYN_NODE_MEMBER:
                     irn = GGC_NEW(SDyn_IRNode);
-                    irn->op = SDYN_NODE_ASSIGNMEMBER;
-                    irn->rtype = SDYN_TYPE_BOXED;
+                    GGC_WD(irn, op, SDYN_NODE_ASSIGNMEMBER);
+                    GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
 
                     /* get the object */
-                    children = GGC_R(cnode, children);
-                    irn->left = SUB(0);
-                    children = GGC_R(node, children);
+                    children = GGC_RP(cnode, children);
+                    i = SUB(0);
+                    GGC_WD(irn, left, i);
+                    children = GGC_RP(node, children);
 
                     /* the name is the token */
-                    tok = cnode->tok;
+                    tok = GGC_RD(cnode, tok);
                     name = sdyn_boxString((char *) tok.val, tok.valLen);
-                    GGC_W(irn, immp, name);
+                    GGC_WP(irn, immp, name);
 
                     /* get the value */
-                    irn->right = SUB(1);
+                    i = SUB(1);
+                    GGC_WD(irn, right, i);
 
                     /* and perform the assignment */
                     SDyn_IRNodeListPush(ir, irn);
@@ -168,17 +181,17 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                     val = SUB(1);
 
                     /* update the symbol table */
-                    tok = cnode->tok;
+                    tok = GGC_RD(cnode, tok);
                     name = sdyn_boxString((char *) tok.val, tok.valLen);
                     indexBox = GGC_NEW(GGC_size_t_Unit);
-                    indexBox->v = val;
+                    GGC_WD(indexBox, v, val);
                     SDyn_IndexMapPut(symbols, name, indexBox);
 
                     break;
                 }
 
                 default:
-                    fprintf(stderr, "Invalid assignment to %s!\n", sdyn_nodeNames[cnode->type]);
+                    fprintf(stderr, "Invalid assignment to %s!\n", sdyn_nodeNames[GGC_RD(cnode, type)]);
                     abort();
             }
             break;
@@ -188,26 +201,26 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             size_t g;
 
             /* just get it out of the symbol table */
-            tok = node->tok;
+            tok = GGC_RD(node, tok);
             name = sdyn_boxString((char *) tok.val, tok.valLen);
             if (SDyn_IndexMapGet(symbols, name, &indexBox))
-                return indexBox->v;
+                return GGC_RD(indexBox, v);
 
             /* not in the local symbol table, must be a global */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_TOP;
-            irn->rtype = SDYN_TYPE_OBJECT;
-            g = ir->length;
+            GGC_WD(irn, op, SDYN_NODE_TOP);
+            GGC_WD(irn, rtype, SDYN_TYPE_OBJECT);
+            g = GGC_RD(ir, length);
             SDyn_IRNodeListPush(ir, irn);
 
             /* do a member lookup */
             irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_MEMBER;
-            irn->rtype = SDYN_TYPE_BOXED;
-            irn->left = g;
-            tok = node->tok;
+            GGC_WD(irn, op, SDYN_NODE_MEMBER);
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            GGC_WD(irn, left, g);
+            tok = GGC_RD(node, tok);
             name = sdyn_boxString((char *) tok.val, tok.valLen);
-            GGC_W(irn, immp, name);
+            GGC_WP(irn, immp, name);
             SDyn_IRNodeListPush(ir, irn);
 
             break;
@@ -221,22 +234,24 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             f = SUB(0);
 
             /* get all the arguments */
-            cnode = GGC_RA(children, 1);
-            children = GGC_R(cnode, children);
+            cnode = GGC_RAP(children, 1);
+            children = GGC_RP(cnode, children);
             for (i = 0; i < children->length; i++) {
+                size_t v;
+
                 /* put in an arg slot */
                 irn = GGC_NEW(SDyn_IRNode);
-                irn->op = SDYN_NODE_ARG;
-                irn->imm = i;
-                irn->left = SUB(i);
+                GGC_WD(irn, op, SDYN_NODE_ARG);
+                GGC_WD(irn, imm, i);
+                v = SUB(i);
+                GGC_WD(irn, left, v);
                 SDyn_IRNodeListPush(ir, irn);
             }
 
             /* now perform the call */
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->rtype = SDYN_TYPE_BOXED;
-            irn->left = f;
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            GGC_WD(irn, left, f);
             SDyn_IRNodeListPush(ir, irn);
 
             break;
@@ -245,25 +260,27 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
         case SDYN_NODE_INTRINSICCALL:
         {
             /* get all the arguments */
-            cnode = GGC_RA(children, 0);
-            children = GGC_R(cnode, children);
+            cnode = GGC_RAP(children, 0);
+            children = GGC_RP(cnode, children);
             for (i = 0; i < children->length; i++) {
+                size_t v;
+
                 /* put in an arg slot */
                 irn = GGC_NEW(SDyn_IRNode);
-                irn->op = SDYN_NODE_ARG;
-                irn->imm = i;
-                irn->left = SUB(i);
+                GGC_WD(irn, op, SDYN_NODE_ARG);
+                GGC_WD(irn, imm, i);
+                v = SUB(i);
+                GGC_WD(irn, left, v);
                 SDyn_IRNodeListPush(ir, irn);
             }
 
             /* now perform the call */
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->rtype = SDYN_TYPE_BOXED;
-            irn->imm = children->length;
-            tok = node->tok;
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            GGC_WD(irn, imm, i);
+            tok = GGC_RD(node, tok);
             name = sdyn_boxString((char *) tok.val, tok.valLen);
-            GGC_W(irn, immp, name);
+            GGC_WP(irn, immp, name);
             SDyn_IRNodeListPush(ir, irn);
 
             break;
@@ -271,50 +288,53 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         /* 0-ary */
         case SDYN_NODE_OBJ:
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->rtype = SDYN_TYPE_OBJECT;
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_OBJECT);
             SDyn_IRNodeListPush(ir, irn);
             break;
 
         case SDYN_NODE_NUM:
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->rtype = SDYN_TYPE_INT;
-            tok = node->tok;
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_INT);
+            tok = GGC_RD(node, tok);
             name = sdyn_boxString((char *) tok.val, tok.valLen);
-            irn->imm = sdyn_toNumber((SDyn_Undefined) name);
+            {
+                long v = sdyn_toNumber((SDyn_Undefined) name);
+                GGC_WD(irn, imm, v);
+            }
             SDyn_IRNodeListPush(ir, irn);
             break;
 
         /* unary */
         case SDYN_NODE_RETURN:
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->left = SUB(0);
+            IRNNEW();
+            i = SUB(0);
+            GGC_WD(irn, left, i);
             SDyn_IRNodeListPush(ir, irn);
             break;
 
         /* binary */
         case SDYN_NODE_ADD:
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = node->type;
-            irn->rtype = SDYN_TYPE_BOXED;
-            irn->left = SUB(0);
-            irn->right = SUB(1);
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            i = SUB(0);
+            GGC_WD(irn, left, i);
+            i = SUB(1);
+            GGC_WD(irn, right, i);
             SDyn_IRNodeListPush(ir, irn);
             break;
 
         default:
             fprintf(stderr, "Unsupported node %s! (%.*s)\n",
-                sdyn_nodeNames[node->type], node->tok.valLen, node->tok.val);
+                sdyn_nodeNames[GGC_RD(node, type)], GGC_RD(node, tok).valLen, GGC_RD(node, tok).val);
             abort();
     }
 
 #undef SUB
+#undef IRNNEW
 
     /* with no other return known, we assume the last IR node is the result */
-    return ir->length - 1;
+    return GGC_RD(ir, length) - 1;
 }
 
 /* compile a function to IR */
@@ -367,33 +387,38 @@ static void dumpIR(SDyn_IRNodeArray ir)
     SDyn_Tag tag = NULL;
     GGC_char_Array arr = NULL, yes = NULL, na = NULL;
     size_t i;
+    char c;
 
     GGC_PUSH_7(ir, node, string, tag, arr, yes, na);
 
     yes = GGC_NEW_DA(char, 1);
-    yes->a[0] = '+';
+    c = '+';
+    GGC_WAD(yes, 0, c);
     na = GGC_NEW_DA(char, 1);
-    na->a[0] = '-';
+    c = '-';
+    GGC_WAD(na, 0, c);
 
     for (i = 0; i < ir->length; i++) {
-        node = GGC_RA(ir, i);
+        node = GGC_RAP(ir, i);
 
         /* try to get out the immp value */
-        string = (SDyn_String) GGC_R(node, immp);
+        string = (SDyn_String) GGC_RP(node, immp);
         arr = na;
         if (string) {
             arr = yes;
             tag = (SDyn_Tag) GGC_RUP(string);
-            if (tag && tag->type == SDYN_TYPE_STRING)
-                arr = GGC_R(string, value);
+            if (tag && GGC_RD(tag, type) == SDYN_TYPE_STRING)
+                arr = GGC_RP(string, value);
         }
 
         /* and print it */
         printf("%lu:\r\t %s\r\t\t\t t:%d\r\t\t\t\t s:%d:%lu\r\t\t\t\t\t i:%lu:%.*s\r\t\t\t\t\t\t\t o:%lu:%lu\n",
-                (unsigned long) i, sdyn_nodeNames[node->op], node->rtype,
-                node->stype, (unsigned long) node->addr,
-                (unsigned long) node->imm, arr->length, arr->a,
-                (unsigned long) node->left, (unsigned long) node->right);
+                (unsigned long) i,
+                sdyn_nodeNames[GGC_RD(node, op)],
+                GGC_RD(node, rtype),
+                GGC_RD(node, stype), (unsigned long) GGC_RD(node, addr),
+                (unsigned long) GGC_RD(node, imm), arr->length, arr->a__data,
+                (unsigned long) GGC_RD(node, left), (unsigned long) GGC_RD(node, right));
     }
 
     return;

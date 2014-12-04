@@ -9,10 +9,10 @@ static size_t stringHash(SDyn_String str)
     size_t i, ret = 0;
 
     GGC_PUSH_2(str, arr);
-    arr = GGC_R(str, value);
+    arr = GGC_RP(str, value);
 
     for (i = 0; i < arr->length; i++)
-        ret = ((unsigned char) arr->a[i]) + (ret << 16) - ret;
+        ret = ((unsigned char) GGC_RAD(arr, i)) + (ret << 16) - ret;
 
     return ret;
 }
@@ -24,15 +24,15 @@ static int stringCmp(SDyn_String strl, SDyn_String strr)
     int ret;
 
     GGC_PUSH_4(strl, strr, arrl, arrr);
-    arrl = GGC_R(strl, value);
-    arrr = GGC_R(strr, value);
+    arrl = GGC_RP(strl, value);
+    arrr = GGC_RP(strr, value);
     lenl = arrl->length;
     lenr = arrr->length;
     if (lenl < lenr) minlen = lenl;
     else minlen = lenr;
 
     /* do the direct comparison */
-    ret = memcmp(arrl->a, arrr->a, minlen);
+    ret = memcmp(arrl->a__data, arrr->a__data, minlen);
 
     /* then adjust for length */
     if (ret == 0) {
@@ -76,33 +76,33 @@ void sdyn_initValues()
 
     /* undefined */
     tag = GGC_NEW(SDyn_Tag);
-    tag->type = SDYN_TYPE_BOXED_UNDEFINED;
+    GGC_WD(tag, type, SDYN_TYPE_BOXED_UNDEFINED);
     sdyn_undefined = GGC_NEW(SDyn_Undefined);
     GGC_WUP(sdyn_undefined, tag);
 
     /* boolean */
     tag = GGC_NEW(SDyn_Tag);
-    tag->type = SDYN_TYPE_BOXED_BOOL;
+    GGC_WD(tag, type, SDYN_TYPE_BOXED_BOOL);
     sdyn_false = GGC_NEW(SDyn_Boolean);
     GGC_WUP(sdyn_false, tag);
     sdyn_true = GGC_NEW(SDyn_Boolean);
-    sdyn_true->value = 1;
+    GGC_WD(sdyn_true, value, 1);
 
     /* number */
     tag = GGC_NEW(SDyn_Tag);
-    tag->type = SDYN_TYPE_BOXED_INT;
+    GGC_WD(tag, type, SDYN_TYPE_BOXED_INT);
     number = GGC_NEW(SDyn_Number);
     GGC_WUP(number, tag);
 
     /* string */
     tag = GGC_NEW(SDyn_Tag);
-    tag->type = SDYN_TYPE_STRING;
+    GGC_WD(tag, type, SDYN_TYPE_STRING);
     string = GGC_NEW(SDyn_String);
     GGC_WUP(string, tag);
 
     /* object */
     tag = GGC_NEW(SDyn_Tag);
-    tag->type = SDYN_TYPE_OBJECT;
+    GGC_WD(tag, type, SDYN_TYPE_OBJECT);
     object = GGC_NEW(SDyn_Object);
     GGC_WUP(object, tag);
 
@@ -117,7 +117,7 @@ SDyn_Number sdyn_boxInt(long value)
     GGC_PUSH_1(ret);
 
     ret = GGC_NEW(SDyn_Number);
-    ret->value = value;
+    GGC_WD(ret, value, value);
 
     return ret;
 }
@@ -131,10 +131,10 @@ SDyn_String sdyn_boxString(char *value, size_t len)
     GGC_PUSH_2(ret, arr);
 
     arr = GGC_NEW_DA(char, len);
-    strncpy(arr->a, value, len);
+    strncpy(arr->a__data, value, len);
 
     ret = GGC_NEW(SDyn_String);
-    GGC_W(ret, value, arr);
+    GGC_WP(ret, value, arr);
 
     return ret;
 }
@@ -150,21 +150,21 @@ int sdyn_toBoolean(SDyn_Undefined value)
     GGC_PUSH_5(value, tag, boolean, number, string);
 
     tag = (SDyn_Tag) GGC_RUP(value);
-    switch (tag->type) {
+    switch (GGC_RD(tag, type)) {
         case SDYN_TYPE_BOXED_BOOL:
             boolean = (SDyn_Boolean) value;
-            return boolean->value;
+            return GGC_RD(boolean, value);
 
         case SDYN_TYPE_BOXED_UNDEFINED:
             return 0;
 
         case SDYN_TYPE_BOXED_INT:
             number = (SDyn_Number) value;
-            return (number->value) ? 1 : 0;
+            return GGC_RD(number, value) ? 1 : 0;
 
         case SDYN_TYPE_STRING:
             string = (SDyn_String) value;
-            return (GGC_R(string, value)->length) ? 1 : 0;
+            return (GGC_RP(string, value)->length) ? 1 : 0;
 
         default:
             return 1;
@@ -183,17 +183,17 @@ long sdyn_toNumber(SDyn_Undefined value)
     GGC_PUSH_6(value, tag, number, boolean, string, strRaw);
 
     tag = (SDyn_Tag) GGC_RUP(value);
-    switch (tag->type) {
+    switch (GGC_RD(tag, type)) {
         case SDYN_TYPE_BOXED_INT:
             number = (SDyn_Number) value;
-            return number->value;
+            return GGC_RD(number, value);
 
         case SDYN_TYPE_BOXED_UNDEFINED:
             return 0;
 
         case SDYN_TYPE_BOXED_BOOL:
             boolean = (SDyn_Boolean) value;
-            return boolean->value;
+            return GGC_RD(boolean, value);
 
         case SDYN_TYPE_STRING:
         {
@@ -202,14 +202,14 @@ long sdyn_toNumber(SDyn_Undefined value)
             long val = 0;
             int sign = 1;
             string = (SDyn_String) value;
-            strRaw = GGC_R(string, value);
+            strRaw = GGC_RP(string, value);
             i = 0;
-            if (strRaw->a[0] == '-') {
+            if (GGC_RAD(strRaw, 0) == '-') {
                 sign = -1;
                 i++;
-            } else if (strRaw->a[0] == '+') i++;
+            } else if (GGC_RAD(strRaw, 0) == '+') i++;
             for (; i < strRaw->length; i++) {
-                char c = strRaw->a[i];
+                char c = GGC_RAD(strRaw, i);
                 if (c >= '0' && c <= '9') {
                     val *= 10;
                     val += (c - '0');
@@ -235,7 +235,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
     GGC_PUSH_6(value, tag, ret, ca, boolean, number);
 
     tag = (SDyn_Tag) GGC_RUP(value);
-    switch (tag->type) {
+    switch (GGC_RD(tag, type)) {
         case SDYN_TYPE_STRING:
             return (SDyn_String) value;
 
@@ -243,7 +243,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
         {
             static const char sundefined[] = "undefined";
             ca = GGC_NEW_DA(char, sizeof(sundefined)-1);
-            memcpy(ca->a, sundefined, sizeof(sundefined)-1);
+            memcpy(ca->a__data, sundefined, sizeof(sundefined)-1);
             break;
         }
 
@@ -252,12 +252,12 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
             static const char strue[] = "true";
             static const char sfalse[] = "false";
             boolean = (SDyn_Boolean) value;
-            if (boolean->value) {
+            if (GGC_RD(boolean, value)) {
                 ca = GGC_NEW_DA(char, sizeof(strue)-1);
-                memcpy(ca->a, strue, sizeof(strue)-1);
+                memcpy(ca->a__data, strue, sizeof(strue)-1);
             } else {
                 ca = GGC_NEW_DA(char, sizeof(sfalse)-1);
-                memcpy(ca->a, sfalse, sizeof(sfalse)-1);
+                memcpy(ca->a__data, sfalse, sizeof(sfalse)-1);
             }
             break;
         }
@@ -269,7 +269,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
             number = (SDyn_Number) value;
 
             /* first determine the necessary length */
-            val = number->value;
+            val = GGC_RD(number, value);
             if (val < 0) len = 1;
             else len = 0;
             if (val == 0) len++;
@@ -279,13 +279,19 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
             ca = GGC_NEW_DA(char, len);
 
             /* and convert */
-            val = number->value;
+            val = GGC_RD(number, value);
             for (len--; len > 0; len--) {
-                ca->a[len] = (val % 10) + '0';
+                char c = (val % 10) + '0';
+                GGC_WAD(ca, len, c);
                 val /= 10;
             }
-            if (number->value < 0) ca->a[0] = '-';
-            else ca->a[0] = (val % 10) + '0';
+            if (GGC_RD(number, value) < 0) {
+                char c = '-';
+                GGC_WAD(ca, 0, c);
+            } else {
+                char c = (val % 10) + '0';
+                GGC_WAD(ca, 0, c);
+            }
             break;
         }
 
@@ -293,7 +299,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
         {
             static const char sobject[] = "[object Object]";
             ca = GGC_NEW_DA(char, sizeof(sobject)-1);
-            memcpy(ca->a, sobject, sizeof(sobject)-1);
+            memcpy(ca->a__data, sobject, sizeof(sobject)-1);
             break;
         }
 
@@ -301,7 +307,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
         {
             static const char sfunction[] = "[function]";
             ca = GGC_NEW_DA(char, sizeof(sfunction)-1);
-            memcpy(ca->a, sfunction, sizeof(sfunction)-1);
+            memcpy(ca->a__data, sfunction, sizeof(sfunction)-1);
             break;
         }
 
@@ -309,13 +315,13 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
         {
             static const char serror[] = "[ERROR!]";
             ca = GGC_NEW_DA(char, sizeof(serror)-1);
-            memcpy(ca->a, serror, sizeof(serror)-1);
+            memcpy(ca->a__data, serror, sizeof(serror)-1);
         }
     }
 
     /* now convert the character array into a string */
     ret = GGC_NEW(SDyn_String);
-    GGC_W(ret, value, ca);
+    GGC_WP(ret, value, ca);
 
     return ret;
 }
@@ -327,7 +333,7 @@ SDyn_Undefined sdyn_toValue(SDyn_Undefined value)
 
     GGC_PUSH_2(value, tag);
     tag = (SDyn_Tag) GGC_RUP(value);
-    switch (tag->type) {
+    switch (GGC_RD(tag, type)) {
         case SDYN_TYPE_BOXED_INT:
         case SDYN_TYPE_STRING:
             return value;
