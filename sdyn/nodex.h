@@ -1,16 +1,34 @@
-SDYN_NODEX(NIL)
-SDYN_NODEX(TOP)
-SDYN_NODEX(GLOBALCALL)
-SDYN_NODEX(FUNDECL)
-SDYN_NODEX(VARDECLS)
-SDYN_NODEX(VARDECL)
-SDYN_NODEX(PARAMS)
-SDYN_NODEX(PARAM)
-SDYN_NODEX(STATEMENTS)
-SDYN_NODEX(IF)
-SDYN_NODEX(WHILE)
-SDYN_NODEX(RETURN)
-SDYN_NODEX(ASSIGN)
+/* NODE MACRO               PARSER INFO             IR INFO */
+/*                          Format:
+ *                          <corresponding token or -> [<children>]
+ *                          OR
+ *                          list (for simple lists)
+ *                                                  Format:
+ *                                                  i:immediate number
+ *                                                  s:immediate string
+ *                                                  l:left operand
+ *                                                  r:right operand
+ *                                                  3:third operand */
+SDYN_NODEX(NIL)         /*  - []                    eval to undefined */
+SDYN_NODEX(TOP)         /*  list                    global object   */
+SDYN_NODEX(GLOBALCALL)  /*  <id> []                 unused          */
+SDYN_NODEX(FUNDECL)     /*  <id> [Params, VarDecls, Statements]
+                                                    unused          */
+SDYN_NODEX(VARDECLS)    /*  list                    unused          */
+SDYN_NODEX(VARDECL)     /*  <id> []                 unused          */
+SDYN_NODEX(PARAMS)      /*  list                    unused          */
+SDYN_NODEX(PARAM)       /*  <id> []                 i:parameter number */
+SDYN_NODEX(STATEMENTS)  /*  list                    unused          */
+SDYN_NODEX(IF)          /*  - [Expression, Statements, ElseClause]
+                                                    TBD             */
+SDYN_NODEX(WHILE)       /*  - [Expression, Statements]
+                                                    TBD             */
+SDYN_NODEX(RETURN)      /*  - [Expression]          l:Expression    */
+SDYN_NODEX(ASSIGN)      /*  - [LVal, Expression]    unused          */
+
+/* BINARY EXPRESSIONS:      - [Left expression, Right expression]
+ *                                                  l:Left expression
+ *                                                  r:Right expression */
 SDYN_NODEX(OR)
 SDYN_NODEX(AND)
 SDYN_NODEX(EQ)
@@ -24,24 +42,46 @@ SDYN_NODEX(SUB)
 SDYN_NODEX(MUL)
 SDYN_NODEX(MOD)
 SDYN_NODEX(DIV)
+/* /BINARY */
+
+/* UNARY EXPRESSIONS:       - [Expression]          l:Expression    */
 SDYN_NODEX(NOT)
 SDYN_NODEX(TYPEOF)
-SDYN_NODEX(CALL)
-SDYN_NODEX(INDEX)
-SDYN_NODEX(MEMBER)
+/* /UNARY */
+
+SDYN_NODEX(CALL)        /*  - [PostfixExpression, Args]
+                                                    Args implicit
+                                                    l:PostfixExpression */
+SDYN_NODEX(INDEX)       /*  - [PostfixExpression, Expression]
+                                                    l:PostfixExpression
+                                                    r:Expression        */
+SDYN_NODEX(MEMBER)      /* <id> [PostfixExpression]
+                                                    s:<id>
+                                                    l:PostfixExpression */
 SDYN_NODEX(INTRINSICCALL)
-SDYN_NODEX(ARGS)
-SDYN_NODEX(VARREF)
-SDYN_NODEX(NUM)
-SDYN_NODEX(STR)
-SDYN_NODEX(FALSE)
-SDYN_NODEX(TRUE)
-SDYN_NODEX(OBJ)
+                        /* <id> [Args]              Args implicit
+                         *                          s:<id>          */
+SDYN_NODEX(ARGS)        /*  list                    unused          */
+SDYN_NODEX(VARREF)      /*  <id> []                 unused          */
+SDYN_NODEX(NUM)         /*  <num> []                i:<num>         */
+SDYN_NODEX(STR)         /*  <str> []                s:resolved string value */
+SDYN_NODEX(FALSE)       /*  - []                    eval to false   */
+SDYN_NODEX(TRUE)        /*  - []                    eval to true    */
+SDYN_NODEX(OBJ)         /*  - []                    eval to new object */
 
 /* nodes for IR only */
-SDYN_NODEX(ALLOCA)
-SDYN_NODEX(POPA)
-SDYN_NODEX(ASSIGNINDEX)
-SDYN_NODEX(ASSIGNMEMBER)
-SDYN_NODEX(ARG)
-SDYN_NODEX(RETURNUNDEFINED)
+SDYN_NODEX(ALLOCA)          /* allocates space. Updated by register allocation
+                               to be able to spill. i:Number of words to
+                               reserve */
+SDYN_NODEX(POPA)            /* pops space allocated by ALLOCA */
+SDYN_NODEX(ASSIGNINDEX)     /* x[y]=z
+                               l:x
+                               r:y
+                               3:z */
+SDYN_NODEX(ASSIGNMEMBER)    /* x.y=z
+                               s:y
+                               l:x
+                               r:z */
+SDYN_NODEX(ARG)             /* used implicitly by *CALL
+                               i:argument number
+                               l:value */
