@@ -55,14 +55,18 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SUB(1); /* vardecls */
             SUB(2); /* statements */
 
+            /* return undefined */
+            irn = GGC_NEW(SDyn_IRNode);
+            irn->op = SDYN_NODE_NIL;
+            SDyn_IRNodeListPush(ir, irn);
+            irn = GGC_NEW(SDyn_IRNode);
+            irn->op = SDYN_NODE_RETURN;
+            irn->left = ir->length - 1;
+            SDyn_IRNodeListPush(ir, irn);
+
             /* pop our space */
             irn = GGC_NEW(SDyn_IRNode);
             irn->op = SDYN_NODE_POPA;
-            SDyn_IRNodeListPush(ir, irn);
-
-            /* and return undefined */
-            irn = GGC_NEW(SDyn_IRNode);
-            irn->op = SDYN_NODE_RETURNUNDEFINED;
             SDyn_IRNodeListPush(ir, irn);
             break;
 
