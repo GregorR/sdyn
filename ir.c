@@ -359,16 +359,36 @@ SDyn_IRNodeArray sdyn_irCompile(SDyn_Node func, struct SDyn_RegisterMap *registe
 static void dumpIR(SDyn_IRNodeArray ir)
 {
     SDyn_IRNode node = NULL;
+    SDyn_String string = NULL;
+    SDyn_Tag tag = NULL;
+    GGC_char_Array arr = NULL, yes = NULL, na = NULL;
     size_t i;
 
-    GGC_PUSH_2(ir, node);
+    GGC_PUSH_7(ir, node, string, tag, arr, yes, na);
+
+    yes = GGC_NEW_DA(char, 1);
+    yes->a[0] = '+';
+    na = GGC_NEW_DA(char, 1);
+    na->a[0] = '-';
 
     for (i = 0; i < ir->length; i++) {
         node = GGC_RA(ir, i);
-        printf("%lu:\r\t %s\r\t\t\t t:%d\r\t\t\t\t s:%d:%lu\r\t\t\t\t\t i:%lu:%c\r\t\t\t\t\t\t o:%lu:%lu\n",
+
+        /* try to get out the immp value */
+        string = (SDyn_String) GGC_R(node, immp);
+        arr = na;
+        if (string) {
+            arr = yes;
+            tag = (SDyn_Tag) GGC_RUP(string);
+            if (tag && tag->type == SDYN_TYPE_STRING)
+                arr = GGC_R(string, value);
+        }
+
+        /* and print it */
+        printf("%lu:\r\t %s\r\t\t\t t:%d\r\t\t\t\t s:%d:%lu\r\t\t\t\t\t i:%lu:%.*s\r\t\t\t\t\t\t\t o:%lu:%lu\n",
                 (unsigned long) i, sdyn_nodeNames[node->op], node->rtype,
                 node->stype, (unsigned long) node->addr,
-                (unsigned long) node->imm, GGC_R(node, immp) ? 'Y' : 'N',
+                (unsigned long) node->imm, arr->length, arr->a,
                 (unsigned long) node->left, (unsigned long) node->right);
     }
 
