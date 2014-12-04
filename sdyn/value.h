@@ -2,6 +2,8 @@
 #define SDYN_VALUE_H 1
 
 #include "ggggc/gc.h"
+#include "ggggc/collections/map.h"
+#include "ggggc/collections/unit.h"
 
 #include "ir.h"
 
@@ -66,25 +68,11 @@ GGC_END_TYPE(SDyn_Shape,
     );
 
 /* map of strings to object shapes */
-GGC_PA_TYPE(GGC_char_Array)
-GGC_TYPE(SDyn_ShapeMap)
-    GGC_MDATA(size_t, sz);
-    GGC_MPTR(GGC_char_ArrayArray, names);
-    GGC_MPTR(SDyn_ShapeArray, values);
-GGC_END_TYPE(SDyn_ShapeMap,
-    GGC_PTR(SDyn_ShapeMap, names)
-    GGC_PTR(SDyn_ShapeMap, values)
-    );
+GGC_MAP_DECL(SDyn_ShapeMap, SDyn_String, SDyn_Shape);
 
 /* map of strings to indexes (size_ts) */
-GGC_TYPE(SDyn_IndexMap)
-    GGC_MDATA(size_t, sz);
-    GGC_MPTR(GGC_char_ArrayArray, names);
-    GGC_MPTR(GGC_size_t_Array, indices);
-GGC_END_TYPE(SDyn_IndexMap,
-    GGC_PTR(SDyn_IndexMap, names)
-    GGC_PTR(SDyn_IndexMap, indices)
-    );
+GGC_UNIT(size_t)
+GGC_MAP_DECL(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit);
 
 /* object */
 GGC_TYPE(SDyn_Object)
@@ -125,5 +113,8 @@ int sdyn_toBoolean(SDyn_Undefined value);
 long sdyn_toNumber(SDyn_Undefined value);
 SDyn_String sdyn_toString(SDyn_Undefined value);
 SDyn_Undefined sdyn_toValue(SDyn_Undefined value);
+
+/* functions for our maps */
+int sdyn_shapeMapPut(SDyn_ShapeMap map, SDyn_String key, SDyn_Shape value);
 
 #endif

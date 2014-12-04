@@ -2,9 +2,20 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#include "ggggc/gc.h"
+#include "ggggc/collections/list.h"
+
 #include "sdyn/nodes.h"
 #include "sdyn/parser.h"
 #include "sdyn/tokenizer.h"
+
+/* this is as good a place as any to fill in nodeNames */
+char *sdyn_nodeNames[] = {
+#define SDYN_NODEX(x) #x,
+#include "sdyn/nodex.h"
+#undef SDYN_NODEX
+    "LAST"
+};
 
 #define PEEK() (tok = *ntok)
 
@@ -19,7 +30,7 @@
 
 #define ERROR() do { \
     fprintf(stderr, "Unrecoverable error at token %.*s\n", tok.valLen, (char *) tok.val); \
-    exit(1); \
+    abort(); \
 } while(0)
 
 #define ASSERTTOK(ttype) IFNOTTOK(ttype) ERROR()
@@ -36,63 +47,7 @@
     GGC_W(ret, children, childrenv); \
 } while(0)
 
-/* a convenience type for lists */
-GGC_TYPE(SDyn_NodeListNode)
-    GGC_MPTR(SDyn_NodeListNode, next);
-    GGC_MPTR(SDyn_Node, el);
-GGC_END_TYPE(SDyn_NodeListNode,
-    GGC_PTR(SDyn_NodeListNode, next)
-    GGC_PTR(SDyn_NodeListNode, el)
-    );
-
-GGC_TYPE(SDyn_NodeList)
-    GGC_MPTR(SDyn_NodeListNode, head);
-    GGC_MPTR(SDyn_NodeListNode, tail);
-    GGC_MDATA(size_t, len);
-GGC_END_TYPE(SDyn_NodeList,
-    GGC_PTR(SDyn_NodeList, head)
-    GGC_PTR(SDyn_NodeList, tail)
-    );
-
-static void listPush(SDyn_NodeList list, SDyn_Node node)
-{
-    SDyn_NodeListNode lnode = NULL, tail = NULL;
-
-    GGC_PUSH_4(list, node, lnode, tail);
-
-    lnode = GGC_NEW(SDyn_NodeListNode);
-    GGC_W(lnode, el, node);
-    if (GGC_R(list, tail)) {
-        tail = GGC_R(list, tail);
-        GGC_W(tail, next, lnode);
-    } else {
-        GGC_W(list, head, lnode);
-    }
-    GGC_W(list, tail, lnode);
-    list->len++;
-
-    return;
-}
-
-static SDyn_NodeArray listToArray(SDyn_NodeList list)
-{
-    SDyn_Node el = NULL;
-    SDyn_NodeArray arr = NULL;
-    SDyn_NodeListNode cur = NULL;
-    size_t i;
-
-    GGC_PUSH_4(list, el, arr, cur);
-
-    arr = GGC_NEW_PA(SDyn_Node, list->len);
-    for (i = 0, cur = GGC_R(list, head);
-         i < list->len && cur;
-         i++, cur = GGC_R(cur, next)) {
-        el = GGC_R(cur, el);
-        GGC_WA(arr, i, el);
-    }
-
-    return arr;
-}
+GGC_LIST_STATIC(SDyn_Node)
 
 #define PARSER(name) static SDyn_Node parse ## name (struct SDyn_Token *ntok)
 PARSER(Top);
@@ -150,11 +105,11 @@ PARSER(Top)
             break;
         } else ERROR();
 
-        listPush(clist, cur);
+        SDyn_NodeListPush(clist, cur);
     }
 
     /* now build the return */
-    children = listToArray(clist);
+    children = SDyn_NodeListToArray(clist);
     RET(TOP, first, children);
     return ret;
 }
@@ -221,10 +176,10 @@ PARSER(VarDecls)
         PEEK();
         IFNOTTOK(var) break;
         cur = parseVarDecl(ntok);
-        listPush(clist, cur);
+        SDyn_NodeListPush(clist, cur);
     }
 
-    children = listToArray(clist);
+    children = SDyn_NodeListToArray(clist);
     RET(VARDECLS, first, children);
     return ret;
 }
@@ -264,7 +219,7 @@ PARSER(Params)
 
         /* yes. Add it */
         RET(PARAM, tok, GGC_NULL);
-        listPush(clist, ret);
+        SDyn_NodeListPush(clist, ret);
 
         /* now look for more */
         while (1) {
@@ -274,13 +229,13 @@ PARSER(Params)
                 NEXT();
                 ASSERTNEXT(ID);
                 RET(PARAM, tok, GGC_NULL);
-                listPush(clist, ret);
+                SDyn_NodeListPush(clist, ret);
             } else break;
         }
     }
 
     /* and prepare the return */
-    children = listToArray(clist);
+    children = SDyn_NodeListToArray(clist);
     RET(PARAMS, first, children);
     return ret;
 }
@@ -303,10 +258,10 @@ PARSER(Statements)
         PEEK();
         IFTOK(RBRACE) break;
         ret = parseStatement(ntok);
-        listPush(clist, ret);
+        SDyn_NodeListPush(clist, ret);
     }
 
-    children = listToArray(clist);
+    children = SDyn_NodeListToArray(clist);
     RET(STATEMENTS, first, children);
     return ret;
 }
@@ -661,7 +616,7 @@ PARSER(Args)
     /* otherwise, we'd best have a list of args! */
     clist = GGC_NEW(SDyn_NodeList);
     cur = parseExpression(ntok);
-    listPush(clist, cur);
+    SDyn_NodeListPush(clist, cur);
     while (1) {
         PEEK();
 
@@ -669,11 +624,11 @@ PARSER(Args)
             NEXT();
 
             cur = parseExpression(ntok);
-            listPush(clist, cur);
+            SDyn_NodeListPush(clist, cur);
         } else break;
     }
 
-    children = listToArray(clist);
+    children = SDyn_NodeListToArray(clist);
     RET(ARGS, first, children);
 
     return ret;
@@ -726,7 +681,7 @@ static void dumpNode(size_t spcs, SDyn_Node node)
     GGC_PUSH_2(node, children);
 
     for (i = 0; i < spcs; i++) printf("  ");
-    printf("%.*s\n", node->tok.valLen, (char *) node->tok.val);
+    printf("%s: %.*s\n", sdyn_nodeNames[node->type], node->tok.valLen, (char *) node->tok.val);
 
     spcs++;
     children = GGC_R(node, children);

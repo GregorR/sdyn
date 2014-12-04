@@ -32,7 +32,7 @@
 #define SFE(into, func, bad, error, args) \
     SFC(into, func, bad, args) { \
         perror(error); \
-        exit(1); \
+        abort(); \
     }
 
 /* SF: safely use functions that fail with errno without pulling your hair out */

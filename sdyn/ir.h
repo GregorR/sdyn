@@ -28,10 +28,14 @@ GGC_TYPE(SDyn_IRNode)
     GGC_MDATA(size_t, addr); /* the address this value is assigned to */
 
     /* Operands: */
-    GGC_MDATA(size_t, imm); /* any immediate operand */
+    GGC_MDATA(long, imm); /* any immediate operand */
+    GGC_MPTR(void *, immp); /* any pointer immediate operand */
     GGC_MDATA(size_t, left); /* the left operand */
     GGC_MDATA(size_t, right); /* the right operand */
-GGC_END_TYPE(SDyn_IRNode, GGC_NO_PTRS);
+    GGC_MDATA(size_t, third); /* the third operand, if applicable */
+GGC_END_TYPE(SDyn_IRNode,
+    GGC_PTR(SDyn_IRNode, immp)
+    );
 
 /* compile a function to IR */
 SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func);
@@ -40,6 +44,6 @@ SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func);
 void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap);
 
 /* compile and perform register allocation */
-SDyn_IRNodeArray sdyn_irCompile(SDyn_Node func);
+SDyn_IRNodeArray sdyn_irCompile(SDyn_Node func, struct SDyn_RegisterMap *registerMap);
 
 #endif

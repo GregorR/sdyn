@@ -2,6 +2,51 @@
 
 #include "sdyn/value.h"
 
+/* map functions */
+static size_t stringHash(SDyn_String str)
+{
+    GGC_char_Array arr = NULL;
+    size_t i, ret = 0;
+
+    GGC_PUSH_2(str, arr);
+    arr = GGC_R(str, value);
+
+    for (i = 0; i < arr->length; i++)
+        ret = ((unsigned char) arr->a[i]) + (ret << 16) - ret;
+
+    return ret;
+}
+
+static int stringCmp(SDyn_String strl, SDyn_String strr)
+{
+    GGC_char_Array arrl = NULL, arrr = NULL;
+    size_t lenl, lenr, minlen;
+    int ret;
+
+    GGC_PUSH_4(strl, strr, arrl, arrr);
+    arrl = GGC_R(strl, value);
+    arrr = GGC_R(strr, value);
+    lenl = arrl->length;
+    lenr = arrr->length;
+    if (lenl < lenr) minlen = lenl;
+    else minlen = lenr;
+
+    /* do the direct comparison */
+    ret = memcmp(arrl->a, arrr->a, minlen);
+
+    /* then adjust for length */
+    if (ret == 0) {
+        if (lenl < lenr) ret = -1;
+        else if (lenl > lenr) ret = 1;
+    }
+
+    return ret;
+}
+
+/* map definitions */
+GGC_MAP_DEFN(SDyn_ShapeMap, SDyn_String, SDyn_Shape, stringHash, stringCmp);
+GGC_MAP_DEFN(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit, stringHash, stringCmp);
+
 /* important global values */
 SDyn_Undefined sdyn_undefined = NULL;
 SDyn_Boolean sdyn_false = NULL, sdyn_true = NULL;
@@ -155,15 +200,22 @@ long sdyn_toNumber(SDyn_Undefined value)
             /* we can't use strtol, because it depends on a terminated string */
             size_t i;
             long val = 0;
+            int sign = 1;
+            string = (SDyn_String) value;
             strRaw = GGC_R(string, value);
-            for (i = 0; i < strRaw->length; i++) {
+            i = 0;
+            if (strRaw->a[0] == '-') {
+                sign = -1;
+                i++;
+            } else if (strRaw->a[0] == '+') i++;
+            for (; i < strRaw->length; i++) {
                 char c = strRaw->a[i];
                 if (c >= '0' && c <= '9') {
                     val *= 10;
                     val += (c - '0');
                 } else break;
             }
-            return val;
+            return sign * val;
         }
 
         default:

@@ -1,0 +1,9 @@
+function sum(a, b) {
+    return a + b;
+}
+
+function main() {
+    $print(sum(sum(1, 2), sum(3, 4)));
+}
+
+main();
