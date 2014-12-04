@@ -6,6 +6,7 @@
 #include "ggggc/collections/unit.h"
 
 #include "ir.h"
+#include "parser.h"
 
 /* all valid data types */
 enum SDyn_DataType {
@@ -88,9 +89,11 @@ typedef SDyn_Undefined (*sdyn_native_function_t)(struct GGGGC_PointerStack *psta
 
 /* function (data type) */
 GGC_TYPE(SDyn_Function)
+    GGC_MPTR(SDyn_Node, ast);
     GGC_MPTR(SDyn_IRNodeArray, irValue);
     GGC_MDATA(sdyn_native_function_t, value);
 GGC_END_TYPE(SDyn_Function,
+    GGC_PTR(SDyn_Function, ast)
     GGC_PTR(SDyn_Function, irValue)
     );
 
