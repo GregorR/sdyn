@@ -22,10 +22,9 @@ struct SDyn_RegisterMap {
 };
 
 GGC_TYPE(SDyn_IRNode)
+    /* Operation */
     GGC_MDATA(int, op);
     GGC_MDATA(int, rtype); /* result type of this operation */
-    GGC_MDATA(int, stype); /* the storage type in which to place the result */
-    GGC_MDATA(size_t, addr); /* the address this value is assigned to */
 
     /* Operands: */
     GGC_MDATA(long, imm); /* any immediate operand */
@@ -33,8 +32,15 @@ GGC_TYPE(SDyn_IRNode)
     GGC_MDATA(size_t, left); /* the left operand */
     GGC_MDATA(size_t, right); /* the right operand */
     GGC_MDATA(size_t, third); /* the third operand, if applicable */
+
+    /* Register allocation: */
+    GGC_MDATA(int, stype); /* the storage type in which to place the result */
+    GGC_MDATA(size_t, addr); /* the address this value is assigned to */
+    GGC_MDATA(size_t, uidx); /* the index after unification */
+    GGC_MPTR(GGC_size_t_Array, lastUsed); /* values used no later than here */
 GGC_END_TYPE(SDyn_IRNode,
     GGC_PTR(SDyn_IRNode, immp)
+    GGC_PTR(SDyn_IRNode, lastUsed)
     );
 
 /* compile a function to IR */

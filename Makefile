@@ -1,18 +1,20 @@
 CC=gcc
 ECFLAGS=-g
-CFLAGS=-I../ggggc $(ECFLAGS)
-LIBS=../ggggc/libggggc.a -pthread
+CFLAGS=-I../ggggc -I../smalljitasm $(ECFLAGS)
+LIBS=../ggggc/libggggc.a ../smalljitasm/libsmalljitasm.a -pthread
 
 SRCS=\
     tokenizer.c \
     parser.c \
     ir.c \
+    jit.c \
     value.c
 
 ALL=\
     test-tokenizer \
     test-parser \
-    test-ir
+    test-ir \
+    test-jit
 
 all: $(ALL)
 
@@ -24,6 +26,9 @@ test-parser: $(SRCS)
 
 test-ir: $(SRCS)
 	$(CC) $(CFLAGS) -DUSE_SDYN_IR_TEST $(SRCS) $(LIBS) -o $@
+
+test-jit: $(SRCS)
+	$(CC) $(CFLAGS) -DUSE_SDYN_JIT_TEST $(SRCS) $(LIBS) -o $@
 
 clean:
 	rm -f $(ALL)

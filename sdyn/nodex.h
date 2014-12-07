@@ -70,6 +70,9 @@ SDYN_NODEX(TRUE)        /*  - []                    eval to true    */
 SDYN_NODEX(OBJ)         /*  - []                    eval to new object */
 
 /* nodes for IR only */
+SDYN_NODEX(UNIFY)           /* unify two values
+                               l:value 1
+                               r:value 2 */
 SDYN_NODEX(ALLOCA)          /* allocates space. Updated by register allocation
                                to be able to spill. i:Number of words to
                                reserve */

@@ -675,7 +675,7 @@ PARSER(Primary)
 }
 
 #ifdef USE_SDYN_PARSER_TEST
-#include "buffer.h"
+#include "sja/buffer.h"
 
 static void dumpNode(size_t spcs, SDyn_Node node)
 {

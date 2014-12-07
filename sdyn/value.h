@@ -101,6 +101,7 @@ GGC_END_TYPE(SDyn_Function,
 extern SDyn_Undefined sdyn_undefined;
 extern SDyn_Boolean sdyn_false, sdyn_true;
 extern SDyn_Shape sdyn_emptyShape;
+extern SDyn_Object sdyn_globalObject;
 
 /* our global value initializer */
 void sdyn_initValues(void);

@@ -51,10 +51,11 @@ GGC_MAP_DEFN(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit, stringHash, stringCmp)
 SDyn_Undefined sdyn_undefined = NULL;
 SDyn_Boolean sdyn_false = NULL, sdyn_true = NULL;
 SDyn_Shape sdyn_emptyShape = NULL;
+SDyn_Object sdyn_globalObject = NULL;
 
 static void pushGlobals()
 {
-    GGC_PUSH_4(sdyn_undefined, sdyn_false, sdyn_true, sdyn_emptyShape);
+    GGC_PUSH_5(sdyn_undefined, sdyn_false, sdyn_true, sdyn_emptyShape, sdyn_globalObject);
     GGC_GLOBALIZE();
     return;
 }
@@ -65,9 +66,8 @@ void sdyn_initValues()
     SDyn_Tag tag = NULL;
     SDyn_Number number = NULL;
     SDyn_String string = NULL;
-    SDyn_Object object = NULL;
 
-    GGC_PUSH_4(tag, number, string, object);
+    GGC_PUSH_3(tag, number, string);
 
     /* first push them to the global pointer stack */
     pushGlobals();
@@ -103,8 +103,8 @@ void sdyn_initValues()
     /* object */
     tag = GGC_NEW(SDyn_Tag);
     GGC_WD(tag, type, SDYN_TYPE_OBJECT);
-    object = GGC_NEW(SDyn_Object);
-    GGC_WUP(object, tag);
+    sdyn_globalObject = GGC_NEW(SDyn_Object);
+    GGC_WUP(sdyn_globalObject, tag);
 
     return;
 }

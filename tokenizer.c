@@ -168,7 +168,7 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
 #include <stdlib.h>
 #include <sys/types.h>
 
-#include "buffer.h"
+#include "sja/buffer.h"
 
 int main()
 {
