@@ -1,5 +1,11 @@
-#include <string.h>
+#define _BSD_SOURCE /* for MAP_ANON */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+
+#include "sdyn/jit.h"
 #include "sdyn/value.h"
 
 /* map functions */
@@ -66,8 +72,11 @@ void sdyn_initValues()
     SDyn_Tag tag = NULL;
     SDyn_Number number = NULL;
     SDyn_String string = NULL;
+    SDyn_ShapeMap esm = NULL;
+    SDyn_IndexMap eim = NULL;
+    SDyn_UndefinedArray em = NULL;
 
-    GGC_PUSH_3(tag, number, string);
+    GGC_PUSH_6(tag, number, string, esm, eim, em);
 
     /* first push them to the global pointer stack */
     pushGlobals();
@@ -100,20 +109,64 @@ void sdyn_initValues()
     string = GGC_NEW(SDyn_String);
     GGC_WUP(string, tag);
 
+    /* the empty shape */
+    sdyn_emptyShape = GGC_NEW(SDyn_Shape);
+    esm = GGC_NEW(SDyn_ShapeMap);
+    eim = GGC_NEW(SDyn_IndexMap);
+    GGC_WP(sdyn_emptyShape, children, esm);
+    GGC_WP(sdyn_emptyShape, members, eim);
+
     /* object */
     tag = GGC_NEW(SDyn_Tag);
     GGC_WD(tag, type, SDYN_TYPE_OBJECT);
     sdyn_globalObject = GGC_NEW(SDyn_Object);
     GGC_WUP(sdyn_globalObject, tag);
+    GGC_WP(sdyn_globalObject, shape, sdyn_emptyShape);
+    em = GGC_NEW_PA(SDyn_Undefined, 0);
+    GGC_WP(sdyn_globalObject, members, em);
+
+    /* so long as we're at it, initialize our pointer stack */
+#define POINTER_STACK_SZ 8388608
+    ggc_jitPointerStack = ggc_jitPointerStackTop =
+        (void **) mmap(NULL, POINTER_STACK_SZ * sizeof(void *), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0) +
+        POINTER_STACK_SZ;
 
     return;
 }
 
+/* simple boxer for functions */
+SDyn_Function sdyn_boxFunction(SDyn_Node ast)
+{
+    SDyn_Function ret = NULL;
+
+    GGC_PUSH_1(ret);
+
+    ret = GGC_NEW(SDyn_Function);
+    GGC_WP(ret, ast, ast);
+
+    return ret;
+}
+
+#define PSTACK() do { \
+    if (pstack) ggc_jitPointerStack = pstack; \
+} while(0)
+
+/* simple boxer for bool */
+SDyn_Boolean sdyn_boxBool(void **pstack, int value)
+{
+    PSTACK();
+    if (value)
+        return sdyn_true;
+    else
+        return sdyn_false;
+}
+
 /* simple boxer for ints */
-SDyn_Number sdyn_boxInt(long value)
+SDyn_Number sdyn_boxInt(void **pstack, long value)
 {
     SDyn_Number ret = NULL;
 
+    PSTACK();
     GGC_PUSH_1(ret);
 
     ret = GGC_NEW(SDyn_Number);
@@ -123,11 +176,12 @@ SDyn_Number sdyn_boxInt(long value)
 }
 
 /* simple boxer for strings */
-SDyn_String sdyn_boxString(char *value, size_t len)
+SDyn_String sdyn_boxString(void **pstack, char *value, size_t len)
 {
     SDyn_String ret = NULL;
     GGC_char_Array arr = NULL;
 
+    PSTACK();
     GGC_PUSH_2(ret, arr);
 
     arr = GGC_NEW_DA(char, len);
@@ -140,13 +194,14 @@ SDyn_String sdyn_boxString(char *value, size_t len)
 }
 
 /* coerce to boolean */
-int sdyn_toBoolean(SDyn_Undefined value)
+int sdyn_toBoolean(void **pstack, SDyn_Undefined value)
 {
     SDyn_Tag tag = NULL;
     SDyn_Boolean boolean = NULL;
     SDyn_Number number = NULL;
     SDyn_String string = NULL;
 
+    PSTACK();
     GGC_PUSH_5(value, tag, boolean, number, string);
 
     tag = (SDyn_Tag) GGC_RUP(value);
@@ -172,7 +227,7 @@ int sdyn_toBoolean(SDyn_Undefined value)
 }
 
 /* coerce to number */
-long sdyn_toNumber(SDyn_Undefined value)
+long sdyn_toNumber(void **pstack, SDyn_Undefined value)
 {
     SDyn_Tag tag = NULL;
     SDyn_Number number = NULL;
@@ -180,6 +235,7 @@ long sdyn_toNumber(SDyn_Undefined value)
     SDyn_String string = NULL;
     GGC_char_Array strRaw = NULL;
 
+    PSTACK();
     GGC_PUSH_6(value, tag, number, boolean, string, strRaw);
 
     tag = (SDyn_Tag) GGC_RUP(value);
@@ -224,7 +280,7 @@ long sdyn_toNumber(SDyn_Undefined value)
 }
 
 /* coerce to string */
-SDyn_String sdyn_toString(SDyn_Undefined value)
+SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value)
 {
     SDyn_Tag tag = NULL;
     SDyn_String ret = NULL;
@@ -232,6 +288,7 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
     SDyn_Boolean boolean = NULL;
     SDyn_Number number = NULL;
 
+    PSTACK();
     GGC_PUSH_6(value, tag, ret, ca, boolean, number);
 
     tag = (SDyn_Tag) GGC_RUP(value);
@@ -327,10 +384,11 @@ SDyn_String sdyn_toString(SDyn_Undefined value)
 }
 
 /* convert to either a string or a number, with preference towards string */
-SDyn_Undefined sdyn_toValue(SDyn_Undefined value)
+SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value)
 {
     SDyn_Tag tag = NULL;
 
+    PSTACK();
     GGC_PUSH_2(value, tag);
     tag = (SDyn_Tag) GGC_RUP(value);
     switch (GGC_RD(tag, type)) {
@@ -339,6 +397,124 @@ SDyn_Undefined sdyn_toValue(SDyn_Undefined value)
             return value;
 
         default:
-            return (SDyn_Undefined) sdyn_toString(value);
+            return (SDyn_Undefined) sdyn_toString(NULL, value);
     }
+}
+
+/* get the index to which a member belongs in this object, creating one if requested */
+size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String member, int create)
+{
+    SDyn_Shape shape = NULL, cshape = NULL;
+    SDyn_ShapeMap shapeChildren = NULL;
+    SDyn_IndexMap shapeMembers = NULL;
+    SDyn_UndefinedArray oldObjectMembers = NULL, newObjectMembers = NULL;
+    GGC_size_t_Unit indexBox = NULL;
+    size_t ret;
+
+    PSTACK();
+    GGC_PUSH_9(object, member, shape, cshape, shapeChildren, shapeMembers,
+        oldObjectMembers, newObjectMembers, indexBox);
+
+    shape = GGC_RP(object, shape);
+
+    /* first check if it already exists */
+    shapeMembers = GGC_RP(shape, members);
+    if (SDyn_IndexMapGet(shapeMembers, member, &indexBox)) {
+        /* got it! */
+        ret = GGC_RD(indexBox, v);
+        return ret;
+    }
+
+    /* nope! Do we stop here? */
+    if (!create) return (size_t) -1;
+
+    /* expand the object */
+    oldObjectMembers = GGC_RP(object, members);
+    ret = oldObjectMembers->length;
+    newObjectMembers = GGC_NEW_PA(SDyn_Undefined, ret + 1);
+    memcpy(newObjectMembers->a__ptrs, oldObjectMembers->a__ptrs, ret * sizeof(SDyn_Undefined));
+    GGC_WAP(newObjectMembers, ret, sdyn_undefined);
+
+    /* check if there's already a defined child with it */
+    shapeChildren = GGC_RP(shape, children);
+    if (SDyn_ShapeMapGet(shapeChildren, member, &shape)) {
+        /* got it! */
+        GGC_WP(object, shape, shape);
+        return ret;
+    }
+
+    /* nope. Make the new shape */
+    cshape = GGC_NEW(SDyn_Shape);
+    SDyn_ShapeMapPut(shapeChildren, member, cshape);
+    ret++;
+    GGC_WD(cshape, size, ret);
+    ret--;
+    shapeChildren = GGC_NEW(SDyn_ShapeMap);
+    GGC_WP(cshape, children, shapeChildren);
+    shapeMembers = SDyn_IndexMapClone(shapeMembers);
+    GGC_WP(cshape, members, shapeMembers);
+    indexBox = GGC_NEW(GGC_size_t_Unit);
+    GGC_WD(indexBox, v, ret);
+    SDyn_IndexMapPut(shapeMembers, member, indexBox);
+    GGC_WP(object, shape, cshape);
+
+    return ret;
+}
+
+/* get a member of an object, or sdyn_undefined if it does not exist */
+SDyn_Undefined sdyn_getObjectMember(void **pstack, SDyn_Object object, SDyn_String member)
+{
+    SDyn_Undefined ret = NULL;
+    size_t idx;
+
+    PSTACK();
+    GGC_PUSH_3(object, member, ret);
+
+    if ((idx = sdyn_getObjectMemberIndex(NULL, object, member, 0)) != (size_t) -1) {
+        ret = GGC_RAP(GGC_RP(object, members), idx);
+        return ret;
+    } else
+        return sdyn_undefined;
+}
+
+/* set or add a member on/to an object */
+void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member, SDyn_Undefined value)
+{
+    SDyn_UndefinedArray members = NULL;
+    size_t idx;
+
+    PSTACK();
+    GGC_PUSH_3(object, member, members);
+
+    idx = sdyn_getObjectMemberIndex(NULL, object, member, 1);
+    members = GGC_RP(object, members);
+    GGC_WAP(members, idx, value);
+
+    return;
+}
+
+/* call a function, with JIT compilation */
+SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args)
+{
+    SDyn_IRNodeArray ir = NULL;
+    sdyn_native_function_t nfunc;
+
+    PSTACK();
+    GGC_PUSH_2(func, ir);
+
+    /* need to compile? */
+    nfunc = GGC_RD(func, value);
+    if (!nfunc) {
+        /* need to IR-compile? */
+        ir = GGC_RP(func, irValue);
+        if (!ir) {
+            ir = sdyn_irCompile(GGC_RP(func, ast), NULL);
+            GGC_WP(func, irValue, ir);
+        }
+
+        nfunc = sdyn_compile(ir);
+        GGC_WD(func, value, nfunc);
+    }
+
+    return nfunc(ggc_jitPointerStack, argCt, args);
 }

@@ -10,8 +10,9 @@
 enum SDyn_StorageType {
     SDYN_STORAGE_NIL,
     SDYN_STORAGE_REG,
-    SDYN_STORAGE_STK, /* self-allocated stack space */
-    SDYN_STORAGE_ASTK, /* argument stack space */
+    SDYN_STORAGE_STK, /* normal (data) stack space */
+    SDYN_STORAGE_ASTK, /* argument stack space (in practice identical to STK) */
+    SDYN_STORAGE_PSTK, /* pointer stack space */
     SDYN_STORAGE_LAST
 };
 

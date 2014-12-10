@@ -57,6 +57,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_ALLOCA);
             SDyn_IRNodeListPush(ir, irn);
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_PALLOCA);
+            SDyn_IRNodeListPush(ir, irn);
 
             SUB(0); /* params */
             SUB(1); /* vardecls */
@@ -74,6 +77,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
             /* pop our space */
             irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_PPOPA);
+            SDyn_IRNodeListPush(ir, irn);
+            irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_POPA);
             SDyn_IRNodeListPush(ir, irn);
             break;
@@ -84,7 +90,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                 cnode = GGC_RAP(children, i);
 
                 tok = GGC_RD(cnode, tok);
-                name = sdyn_boxString((char *) tok.val, tok.valLen);
+                name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
 
                 /* add it to the symbol table */
                 indexBox = GGC_NEW(GGC_size_t_Unit);
@@ -105,7 +111,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_VARDECL:
             tok = GGC_RD(node, tok);
-            name = sdyn_boxString((char *) tok.val, tok.valLen);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
 
             /* add it to the symbol table */
             indexBox = GGC_NEW(GGC_size_t_Unit);
@@ -163,7 +169,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
                     /* the name is the token */
                     tok = GGC_RD(cnode, tok);
-                    name = sdyn_boxString((char *) tok.val, tok.valLen);
+                    name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
                     GGC_WP(irn, immp, name);
 
                     /* get the value */
@@ -184,7 +190,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
                     /* update the symbol table */
                     tok = GGC_RD(cnode, tok);
-                    name = sdyn_boxString((char *) tok.val, tok.valLen);
+                    name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
                     indexBox = GGC_NEW(GGC_size_t_Unit);
                     GGC_WD(indexBox, v, val);
                     SDyn_IndexMapPut(symbols, name, indexBox);
@@ -204,7 +210,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
             /* just get it out of the symbol table */
             tok = GGC_RD(node, tok);
-            name = sdyn_boxString((char *) tok.val, tok.valLen);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             if (SDyn_IndexMapGet(symbols, name, &indexBox))
                 return GGC_RD(indexBox, v);
 
@@ -221,7 +227,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
             GGC_WD(irn, left, g);
             tok = GGC_RD(node, tok);
-            name = sdyn_boxString((char *) tok.val, tok.valLen);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             GGC_WP(irn, immp, name);
             SDyn_IRNodeListPush(ir, irn);
 
@@ -329,7 +335,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
             GGC_WD(irn, imm, i);
             tok = GGC_RD(node, tok);
-            name = sdyn_boxString((char *) tok.val, tok.valLen);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             GGC_WP(irn, immp, name);
             SDyn_IRNodeListPush(ir, irn);
 
@@ -347,9 +353,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_INT);
             tok = GGC_RD(node, tok);
-            name = sdyn_boxString((char *) tok.val, tok.valLen);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             {
-                long v = sdyn_toNumber((SDyn_Undefined) name);
+                long v = sdyn_toNumber(NULL, (SDyn_Undefined) name);
                 GGC_WD(irn, imm, v);
             }
             SDyn_IRNodeListPush(ir, irn);
@@ -411,17 +417,17 @@ SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func)
 void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
 {
     SDyn_IRNode node = NULL, unode = NULL, callNode = NULL;
-    GGC_int_Array regUsed = NULL, irUsed = NULL;
+    GGC_char_Array stksUsed = NULL, pstksUsed = NULL, irUsed = NULL;
     GGC_size_t_Array lastUsed = NULL;
     int last[4];
     int li, tmpi;
-    size_t i, idx, stkUsed, astkUsed;
+    size_t i, idx, stkUsed, pstkUsed, astkUsed;
     long si;
 
-    GGC_PUSH_7(ir, node, unode, callNode, regUsed, irUsed, lastUsed);
+    GGC_PUSH_8(ir, node, unode, callNode, stksUsed, pstksUsed, irUsed, lastUsed);
 
     /* first off, perform unification */
-    irUsed = GGC_NEW_DA(int, ir->length);
+    irUsed = GGC_NEW_DA(char, ir->length);
     for (si = ir->length - 1; si >= 0; si--) {
         li = 0;
         node = GGC_RAP(ir, si);
@@ -511,11 +517,15 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
 
 #undef USED
 
-    /* now do simple register assignment */
-    stkUsed = astkUsed = 0;
+    /* now do simple "register" assignment */
+    stksUsed = GGC_NEW_DA(char, ir->length);
+    pstksUsed = GGC_NEW_DA(char, ir->length);
+    stkUsed = pstkUsed = astkUsed = 0;
     for (si = 0; si < ir->length; si++) {
         int stype = 0;
         size_t addr = 0;
+        GGC_char_Array *cstksUsed;
+        size_t *cstkUsed;
 
         node = GGC_RAP(ir, si);
         idx = GGC_RD(node, uidx);
@@ -545,22 +555,55 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
             continue;
         }
 
-        /* FIXME: do something smart */
-        /* just assign it to the next stack address */
-        stype = SDYN_STORAGE_STK;
-        addr = stkUsed++;
+        /* does it need to go on the pointer stack? */
+        if (GGC_RD(node, rtype) >= SDYN_TYPE_FIRST_BOXED) {
+            stype = SDYN_STORAGE_PSTK;
+            cstksUsed = &pstksUsed;
+            cstkUsed = &pstkUsed;
+        } else {
+            stype = SDYN_STORAGE_STK;
+            cstksUsed = &stksUsed;
+            cstkUsed = &stkUsed;
+        }
+
+        /* find the first free memory address */
+        for (i = 0; i < (*cstksUsed)->length; i++) {
+            if (!GGC_RAD((*cstksUsed), i)) break;
+        }
+
+        /* assign it */
         GGC_WD(node, stype, stype);
-        GGC_WD(node, addr, addr);
+        GGC_WD(node, addr, i);
         GGC_WD(unode, stype, stype);
-        GGC_WD(unode, addr, addr);
+        GGC_WD(unode, addr, i);
+        if (i >= *cstkUsed) *cstkUsed = i + 1;
+        if (cstksUsed == &pstksUsed)
+            GGC_WAD(pstksUsed, i, 1);
+        else
+            GGC_WAD(stksUsed, i, 1);
+
+        /* and remove any that are no longer used */
+        lastUsed = GGC_RP(node, lastUsed);
+        if (lastUsed) {
+            for (i = 0; i < lastUsed->length; i++) {
+                unode = GGC_RAP(ir, GGC_RAD(lastUsed, i));
+                stype = GGC_RD(unode, stype);
+                addr = GGC_RD(unode, addr);
+                if (stype == SDYN_STORAGE_PSTK) {
+                    GGC_WAD(pstksUsed, addr, 0);
+                } else if (stype == SDYN_STORAGE_STK) {
+                    GGC_WAD(stksUsed, addr, 0);
+                }
+            }
+        }
     }
 
     /* now go through and fix up the stack addresses, allocas and popas to account for the argument stack */
-    stkUsed += astkUsed;
+    pstkUsed += astkUsed;
     for (si = 0; si < ir->length; si++) {
         size_t addr = 0;
         node = GGC_RAP(ir, si);
-        if (GGC_RD(node, stype) == SDYN_STORAGE_STK) {
+        if (GGC_RD(node, stype) == SDYN_STORAGE_PSTK) {
             addr = GGC_RD(node, addr) + astkUsed;
             GGC_WD(node, addr, addr);
         }
@@ -569,6 +612,11 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
             case SDYN_NODE_ALLOCA:
             case SDYN_NODE_POPA:
                 GGC_WD(node, imm, stkUsed);
+                break;
+
+            case SDYN_NODE_PALLOCA:
+            case SDYN_NODE_PPOPA:
+                GGC_WD(node, imm, pstkUsed);
                 break;
         }
     }

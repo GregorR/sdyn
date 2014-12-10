@@ -61,6 +61,7 @@ GGC_END_TYPE(SDyn_String,
 typedef struct SDyn_ShapeMap__struct *SDyn_ShapeMap_;
 typedef struct SDyn_IndexMap__struct *SDyn_IndexMap_;
 GGC_TYPE(SDyn_Shape)
+    GGC_MDATA(size_t, size);
     GGC_MPTR(SDyn_ShapeMap_, children);
     GGC_MPTR(SDyn_IndexMap_, members);
 GGC_END_TYPE(SDyn_Shape,
@@ -85,7 +86,7 @@ GGC_END_TYPE(SDyn_Object,
     );
 
 /* function (compiled) */
-typedef SDyn_Undefined (*sdyn_native_function_t)(struct GGGGC_PointerStack *pstack, size_t argCt, SDyn_Undefined *args);
+typedef SDyn_Undefined (*sdyn_native_function_t)(void **pstack, size_t argCt, SDyn_Undefined *args);
 
 /* function (data type) */
 GGC_TYPE(SDyn_Function)
@@ -106,19 +107,36 @@ extern SDyn_Object sdyn_globalObject;
 /* our global value initializer */
 void sdyn_initValues(void);
 
+/* simple boxer for functions */
+SDyn_Function sdyn_boxFunction(SDyn_Node ast);
+
+/* the remaining functions are intended to be called by the JIT */
+
+/* simple boxer for bool */
+SDyn_Boolean sdyn_boxBool(void **pstack, int value);
+
 /* simple boxer for ints */
-SDyn_Number sdyn_boxInt(long value);
+SDyn_Number sdyn_boxInt(void **pstack, long value);
 
 /* simple boxer for strings */
-SDyn_String sdyn_boxString(char *value, size_t len);
+SDyn_String sdyn_boxString(void **pstack, char *value, size_t len);
 
 /* type coercions */
-int sdyn_toBoolean(SDyn_Undefined value);
-long sdyn_toNumber(SDyn_Undefined value);
-SDyn_String sdyn_toString(SDyn_Undefined value);
-SDyn_Undefined sdyn_toValue(SDyn_Undefined value);
+int sdyn_toBoolean(void **pstack, SDyn_Undefined value);
+long sdyn_toNumber(void **pstack, SDyn_Undefined value);
+SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value);
+SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value);
 
-/* functions for our maps */
-int sdyn_shapeMapPut(SDyn_ShapeMap map, SDyn_String key, SDyn_Shape value);
+/* get the index to which a member belongs in this object, creating one if requested */
+size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String member, int create);
+
+/* get a member of an object, or sdyn_undefined if it does not exist */
+SDyn_Undefined sdyn_getObjectMember(void **pstack, SDyn_Object object, SDyn_String member);
+
+/* set or add a member on/to an object */
+void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member, SDyn_Undefined value);
+
+/* call a function, with JIT compilation */
+SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args);
 
 #endif

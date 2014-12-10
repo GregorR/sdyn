@@ -8,15 +8,23 @@ SRCS=\
     parser.c \
     ir.c \
     jit.c \
+    intrinsics.c \
     value.c
 
-ALL=\
+ALL=jsdyn
+
+EXTRAS=\
     test-tokenizer \
     test-parser \
     test-ir \
     test-jit
 
 all: $(ALL)
+
+extras: $(ALL) $(EXTRAS)
+
+jsdyn: $(SRCS)
+	$(CC) $(CFLAGS) $(SRCS) main.c $(LIBS) -o $@
 
 test-tokenizer: $(SRCS)
 	$(CC) $(CFLAGS) -DUSE_SDYN_TOKENIZER_TEST $(SRCS) $(LIBS) -o $@
@@ -31,4 +39,4 @@ test-jit: $(SRCS)
 	$(CC) $(CFLAGS) -DUSE_SDYN_JIT_TEST $(SRCS) $(LIBS) -o $@
 
 clean:
-	rm -f $(ALL)
+	rm -f $(ALL) $(EXTRAS)

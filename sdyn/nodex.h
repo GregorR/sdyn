@@ -73,10 +73,16 @@ SDYN_NODEX(OBJ)         /*  - []                    eval to new object */
 SDYN_NODEX(UNIFY)           /* unify two values
                                l:value 1
                                r:value 2 */
-SDYN_NODEX(ALLOCA)          /* allocates space. Updated by register allocation
-                               to be able to spill. i:Number of words to
-                               reserve */
-SDYN_NODEX(POPA)            /* pops space allocated by ALLOCA */
+SDYN_NODEX(ALLOCA)          /* allocates space. Always the first instruction.
+                               Updated by register allocation to be able to
+                               spill. i:Number of words to reserve */
+SDYN_NODEX(PALLOCA)         /* allocate pointer space. Always the second
+                               instruction. Updated by register allocation.
+                               i:Number of words to reserve */
+SDYN_NODEX(POPA)            /* pops space allocated by ALLOCA. Always the last
+                               instruction */
+SDYN_NODEX(PPOPA)           /* pops space allocated by PALLOCA. Always the
+                               second-to-last instruction */
 SDYN_NODEX(ASSIGNINDEX)     /* x[y]=z
                                l:x
                                r:y

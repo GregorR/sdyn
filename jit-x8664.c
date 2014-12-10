@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include "sdyn/intrinsics.h"
 #include "sdyn/nodes.h"
 #include "sdyn/value.h"
 
@@ -17,7 +18,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
     struct Buffer_uchar buf;
     struct Buffer_size_t returns;
     struct SJA_X8664_Operand left, right, third, target;
-    size_t i;
+    int leftType, rightType, thirdType;
+    size_t i, lastArg;
     long imm;
 
     INIT_BUFFER(buf);
@@ -30,40 +32,92 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 #define CF(x, frel)         sja_compile(OP0(x), &buf, &(frel))
 #define IMM64(o1, v) do { \
     size_t imm64 = (v); \
-    C2(MOV, o1, IMM(imm64>>32)); \
-    C2(SHL, o1, IMM(32)); \
-    C2(OR, o1, IMM(imm64&0xFFFFFFFFL)); \
+    if (imm64 < 0x100000000L) { \
+        C2(MOV, o1, IMM(imm64)); \
+    } else { \
+        C2(MOV, o1, IMM(imm64>>32)); \
+        C2(SHL, o1, IMM(32)); \
+        C2(OR, o1, IMM(imm64&0xFFFFFFFFL)); \
+    } \
 } while(0)
 #define L(frel)             sja_patchFrel(&buf, (frel))
 
     GGC_PUSH_3(ir, node, onode);
 
+    lastArg = 0;
     for (i = 0; i < ir->length; i++) {
         node = GGC_RAP(ir, i);
 
 #define LOADOP(opa, defreg) do { \
     if (GGC_RD(node, opa)) { \
         onode = GGC_RAP(ir, GGC_RD(node, opa)); \
+        opa ## Type = GGC_RD(onode, rtype); \
         onode = GGC_RAP(ir, GGC_RD(onode, uidx)); \
-        if (GGC_RD(onode, stype) == SDYN_STORAGE_STK) { \
+        if (GGC_RD(onode, stype) == SDYN_STORAGE_PSTK) { \
+            opa = defreg; \
+            C2(MOV, defreg, MEM(RDI, 0, RNONE, GGC_RD(onode, addr) * 8)); \
+        } else if (GGC_RD(onode, stype) == SDYN_STORAGE_STK) { \
             opa = defreg; \
             C2(MOV, defreg, MEM(RSP, 0, RNONE, GGC_RD(onode, addr) * 8)); \
         } \
+    } \
+} while(0)
+#define BOX(type, targ, reg) do { \
+    switch (type) { \
+        case SDYN_TYPE_UNDEFINED: \
+            IMM64(RAX, (size_t) (void *) &sdyn_undefined); \
+            C2(MOV, targ, MEM(RAX, 0, RNONE, 0)); \
+            break; \
+            \
+        case SDYN_TYPE_BOOL: \
+            C2(MOV, MEM(RBP, 0, RNONE, -8), RDI); \
+            C2(MOV, RSI, reg); \
+            IMM64(RAX, (size_t) (void *) sdyn_boxBool); \
+            C1(CALL, RAX); \
+            C2(MOV, RDI, MEM(RBP, 0, RNONE, -8)); \
+            C2(MOV, targ, RAX); \
+            break; \
+            \
+        case SDYN_TYPE_INT: \
+            C2(MOV, MEM(RBP, 0, RNONE, -8), RDI); \
+            C2(MOV, RSI, reg); \
+            IMM64(RAX, (size_t) (void *) sdyn_boxInt); \
+            C1(CALL, RAX); \
+            C2(MOV, RDI, MEM(RBP, 0, RNONE, -8)); \
+            C2(MOV, targ, RAX); \
+            break; \
     } \
 } while(0)
 
         LOADOP(left, RAX);
         LOADOP(right, RDX);
 
-        target = RAX;
+        switch (GGC_RD(node, stype)) {
+            case SDYN_STORAGE_STK:
+                target = MEM(RSP, 0, RNONE, GGC_RD(node, addr)*8);
+                break;
+
+            case SDYN_STORAGE_ASTK:
+            case SDYN_STORAGE_PSTK:
+                target = MEM(RDI, 0, RNONE, GGC_RD(node, addr)*8);
+                break;
+
+            default:
+                target = RAX;
+        }
 
         switch (GGC_RD(node, op)) {
             case SDYN_NODE_ALLOCA:
-                imm = GGC_RD(node, imm);
+                imm = GGC_RD(node, imm) + 2;
                 /* must align stack to 16 */
-                if ((imm % 2) == 0) imm++;
+                if ((imm % 2) == 1) imm++;
                 imm *= 8;
                 C2(ENTER, IMM(imm), IMM(0));
+                break;
+
+            case SDYN_NODE_PALLOCA:
+                imm = GGC_RD(node, imm) * 8;
+                C2(SUB, RDI, IMM(imm));
                 break;
 
             case SDYN_NODE_POPA:
@@ -77,10 +131,27 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_PPOPA:
+                imm = GGC_RD(node, imm) * 8;
+                C2(ADD, RDI, IMM(imm));
+                break;
+
+            case SDYN_NODE_INTRINSICCALL:
+                /* FIXME: this is all wrong! */
+                C2(MOV, MEM(RBP, 0, RNONE, -8), RDI);
+                C2(MOV, RSI, IMM(lastArg + 1));
+                C2(LEA, RDX, MEM(RDI, 0, RNONE, 0));
+                IMM64(RAX, (size_t) (void *) sdyn_getIntrinsic((SDyn_String) GGC_RP(node, immp)));
+                C1(CALL, RAX);
+                C2(MOV, RDI, MEM(RBP, 0, RNONE, -8));
+                C2(MOV, target, RAX);
+                break;
+
             /* 0-ary: */
             case SDYN_NODE_NIL:
                 IMM64(target, (size_t) (void *) &sdyn_undefined);
-                C2(MOV, target, MEM(target, 0, RNONE, 0));
+                C2(MOV, RAX, MEM(target, 0, RNONE, 0));
+                C2(MOV, target, RAX);
                 break;
 
             case SDYN_NODE_NUM:
@@ -89,29 +160,24 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             /* Unary: */
             case SDYN_NODE_ARG:
-                /* arguments must be boxed (FIXME: things other than ints) */
-                C2(MOV, RSI, left);
-                IMM64(RAX, (size_t) (void *) sdyn_boxInt);
-                C1(CALL, RAX);
+                lastArg = GGC_RD(node, imm);
+
+                /* arguments must be boxed */
+                BOX(leftType, target, left);
                 break;
 
             case SDYN_NODE_RETURN:
-                C2(MOV, RAX, left);
+                /* returns must be boxed */
+                BOX(leftType, RAX, left);
+
                 /* jump to the return address */
                 while (BUFFER_SPACE(returns) < 1) EXPAND_BUFFER(returns);
                 CF(JMPF, *BUFFER_END(returns));
                 returns.bufused++;
                 break;
 
-            case SDYN_NODE_INTRINSICCALL:
-            case SDYN_NODE_CALL:
-
             default:
                 fprintf(stderr, "Unsupported operation %s!\n", sdyn_nodeNames[GGC_RD(node, op)]);
-        }
-
-        if (GGC_RD(node, stype) == SDYN_STORAGE_STK) {
-            C2(MOV, MEM(RSP, 0, RNONE, GGC_RD(node, addr)*8), target);
         }
     }
 
