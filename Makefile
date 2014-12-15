@@ -3,15 +3,13 @@ ECFLAGS=-g
 CFLAGS=-I../ggggc -I../smalljitasm $(ECFLAGS)
 LIBS=../ggggc/libggggc.a ../smalljitasm/libsmalljitasm.a -pthread
 
-SRCS=\
-    tokenizer.c \
-    parser.c \
-    ir.c \
-    jit.c \
-    intrinsics.c \
-    value.c
-
-ALL=jsdyn
+OBJS=\
+    tokenizer.o \
+    parser.o \
+    ir.o \
+    jit.o \
+    intrinsics.o \
+    value.o
 
 EXTRAS=\
     test-tokenizer \
@@ -19,24 +17,21 @@ EXTRAS=\
     test-ir \
     test-jit
 
-all: $(ALL)
+all: jsdyn
 
-extras: $(ALL) $(EXTRAS)
+extras: jsdyn $(EXTRAS)
 
-jsdyn: $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) main.c $(LIBS) -o $@
+jsdyn: $(OBJS) main.o
+	$(CC) $(CFLAGS) $(OBJS) main.o $(LIBS) -o $@
 
-test-tokenizer: $(SRCS)
-	$(CC) $(CFLAGS) -DUSE_SDYN_TOKENIZER_TEST $(SRCS) $(LIBS) -o $@
+test-%: $(OBJS) %-test.o
+	$(CC) $(CFLAGS) $(filter-out $*.o,$(OBJS)) $*-test.o $(LIBS) -o $@
 
-test-parser: $(SRCS)
-	$(CC) $(CFLAGS) -DUSE_SDYN_PARSER_TEST $(SRCS) $(LIBS) -o $@
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-test-ir: $(SRCS)
-	$(CC) $(CFLAGS) -DUSE_SDYN_IR_TEST $(SRCS) $(LIBS) -o $@
-
-test-jit: $(SRCS)
-	$(CC) $(CFLAGS) -DUSE_SDYN_JIT_TEST $(SRCS) $(LIBS) -o $@
+%-test.o: %.c
+	$(CC) $(CFLAGS) -DUSE_SDYN_`echo "$*" | tr '[a-z]' '[A-Z]'`_TEST -c $*.c -o $*-test.o
 
 clean:
-	rm -f $(ALL) $(EXTRAS)
+	rm -f $(ALL) $(EXTRAS) *.o
