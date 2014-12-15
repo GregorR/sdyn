@@ -141,20 +141,20 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             case SDYN_NODE_POPA:
+                C0(LEAVE);
+                C0(RET);
+                break;
+
+            case SDYN_NODE_PPOPA:
             {
                 size_t j;
                 /* fix up all the forward references */
                 for (j = 0; j < returns.bufused; j++)
                     sja_patchFrel(&buf, returns.buf[j]);
-                C0(LEAVE);
-                C0(RET);
-                break;
-            }
-
-            case SDYN_NODE_PPOPA:
                 imm = GGC_RD(node, imm) * 8;
                 C2(ADD, RDI, IMM(imm));
                 break;
+            }
 
             case SDYN_NODE_INTRINSICCALL:
                 C2(MOV, RSI, IMM(lastArg + 1));
