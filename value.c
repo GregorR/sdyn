@@ -137,6 +137,7 @@ void sdyn_initValues()
     ggc_jitPointerStack = ggc_jitPointerStackTop =
         (void **) mmap(NULL, POINTER_STACK_SZ * sizeof(void *), PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0) +
         POINTER_STACK_SZ;
+#undef POINTER_STACK_SZ
 
     return;
 }
@@ -409,7 +410,7 @@ SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value)
 }
 
 /* assertions */
-void sdyn_assertFunction(void **pstack, SDyn_Function func)
+SDyn_Function sdyn_assertFunction(void **pstack, SDyn_Function func)
 {
     SDyn_Tag tag = NULL;
 
@@ -418,9 +419,11 @@ void sdyn_assertFunction(void **pstack, SDyn_Function func)
 
     tag = (SDyn_Tag) GGC_RUP(func);
     if (GGC_RD(tag, type) != SDYN_TYPE_FUNCTION) {
-        fprintf(stderr, "Attempt to call a non-function!\n");
+        fprintf(stderr, "Attempt to call a non-function (type %d)!\n", GGC_RD(tag, type));
         abort();
     }
+
+    return func;
 }
 
 /* get the index to which a member belongs in this object, creating one if requested */

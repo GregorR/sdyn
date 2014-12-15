@@ -16,7 +16,21 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
     struct SDyn_Token ret;
     memset(&ret, 0, sizeof(ret));
 
-    while (isWhite(*inp)) inp++;
+    /* skip whitespace and comments */
+    while (1) {
+        while (isWhite(*inp)) inp++;
+        if (inp[0] == '/') {
+            if (inp[1] == '/') {
+                /* line comment */
+                inp += 2;
+                while (*inp && *inp != '\n') inp++;
+            } else if (inp[1] == '*') {
+                /* block comment */
+                inp += 2;
+                while (*inp && (inp[0] != '*' || inp[1] != '/')) inp++;
+            } else break;
+        } else break;
+    }
 
     /* if there's no more input, so be it */
     if (!*inp) {

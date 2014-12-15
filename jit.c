@@ -48,6 +48,27 @@ int main()
             addr += 4096;
         }
     }
+
+    /* including symbols for common value functions */
+#define OUTSYM(nm) printf("  %s $%lx\n", #nm, (unsigned long) (void *) &nm)
+    OUTSYM(sdyn_undefined);
+    OUTSYM(sdyn_false);
+    OUTSYM(sdyn_true);
+    OUTSYM(sdyn_globalObject);
+    OUTSYM(sdyn_boxBool);
+    OUTSYM(sdyn_boxInt);
+    OUTSYM(sdyn_boxString);
+    OUTSYM(sdyn_toBoolean);
+    OUTSYM(sdyn_toNumber);
+    OUTSYM(sdyn_toString);
+    OUTSYM(sdyn_toValue);
+    OUTSYM(sdyn_assertFunction);
+    OUTSYM(sdyn_getObjectMemberIndex);
+    OUTSYM(sdyn_getObjectMember);
+    OUTSYM(sdyn_setObjectMember);
+    OUTSYM(sdyn_call);
+#undef OUTSYM
+
     printf("$$\n");
 
     /* and output data */

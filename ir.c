@@ -535,7 +535,7 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
         if (GGC_RD(node, op) == SDYN_NODE_ARG) {
             stype = SDYN_STORAGE_ASTK;
             addr = GGC_RD(node, imm);
-            if (addr <= astkUsed) astkUsed = addr + 1;
+            if (addr >= astkUsed) astkUsed = addr + 1;
             GGC_WD(node, stype, stype);
             GGC_WD(node, addr, addr);
             GGC_WD(unode, stype, stype);
@@ -672,7 +672,7 @@ static void dumpIR(SDyn_IRNodeArray ir)
         }
 
         /* and print it */
-        printf("%lu:\r\t %s\r\t\t\t t:%d\r\t\t\t\t s:%d:%lu\r\t\t\t\t\t i:%lu:%.*s\r\t\t\t\t\t\t\t o:%lu:%lu\n",
+        printf("  %lu:\r\t %s\r\t\t\t t:%d\r\t\t\t\t s:%d:%lu\r\t\t\t\t\t i:%lu:%.*s\r\t\t\t\t\t\t\t o:%lu:%lu\n",
                 (unsigned long) i,
                 sdyn_nodeNames[GGC_RD(node, op)],
                 GGC_RD(node, rtype),
@@ -686,8 +686,10 @@ static void dumpIR(SDyn_IRNodeArray ir)
 
 int main()
 {
-    SDyn_Node pnode = NULL;
+    SDyn_Node pnode = NULL, cnode = NULL;
+    SDyn_NodeArray children = NULL;
     SDyn_IRNodeArray ir = NULL;
+    size_t i;
     struct Buffer_char buf;
     const unsigned char *cur;
 
@@ -698,11 +700,21 @@ int main()
 
     sdyn_initValues();
 
-    GGC_PUSH_2(pnode, ir);
+    GGC_PUSH_4(pnode, cnode, children, ir);
 
     pnode = sdyn_parse(cur);
-    ir = sdyn_irCompile(pnode, NULL);
-    dumpIR(ir);
+    children = GGC_RP(pnode, children);
+
+    for (i = 0; i < children->length; i++) {
+        cnode = GGC_RAP(children, i);
+        if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
+            printf("%.*s:\n",
+                (int) GGC_RD(cnode, tok).valLen, (char *) GGC_RD(cnode, tok).val);
+
+            ir = sdyn_irCompile(cnode, NULL);
+            dumpIR(ir);
+        }
+    }
 
     return 0;
 }

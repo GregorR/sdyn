@@ -1,0 +1,4 @@
+#!/bin/sh
+./test-jit > test.syrec
+SEDSCRIPT=`objdump -m i386:x86-64 -t test.syrec | grep ABS | sed 's#^0*\([^ ]\+\).*\*ABS\* \(.*\)#s/\$0x\1/\2/g;#'`
+objdump -m i386:x86-64 -D test.syrec | sed "$SEDSCRIPT"
