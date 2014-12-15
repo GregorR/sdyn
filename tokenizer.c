@@ -186,7 +186,7 @@ int main()
         if (tok.type == SDYN_TOKEN_EOF) break;
         cur = tok.val + tok.valLen;
 
-        printf("Token %d: %.*s\n", tok.type, tok.valLen, (char *) tok.val);
+        printf("Token %d: %.*s\n", tok.type, (int) tok.valLen, (char *) tok.val);
     }
 
     return 0;

@@ -20,7 +20,7 @@ sdyn_native_function_t sdyn_getIntrinsic(SDyn_String intrinsic)
         return sdyn_iPrint;
     }
 
-    fprintf(stderr, "Invalid native function %.*s!\n", schar->length, schar->a__data);
+    fprintf(stderr, "Invalid native function %.*s!\n", (int) schar->length, schar->a__data);
     abort();
 }
 
@@ -37,7 +37,7 @@ SDyn_Undefined sdyn_iPrint(void **pstack, size_t argCt, SDyn_Undefined *args)
 
     string = sdyn_toString(NULL, args[0]);
     schar = GGC_RP(string, value);
-    printf("%.*s\n", schar->length, schar->a__data);
+    printf("%.*s\n", (int) schar->length, schar->a__data);
 
     return sdyn_undefined;
 }

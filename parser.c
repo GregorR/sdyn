@@ -29,7 +29,7 @@ char *sdyn_nodeNames[] = {
 #define IFNOTTOK(ttype) if (tok.type != SDYN_TOKEN_ ## ttype)
 
 #define ERROR() do { \
-    fprintf(stderr, "Unrecoverable error at token %.*s\n", tok.valLen, (char *) tok.val); \
+    fprintf(stderr, "Unrecoverable error at token %.*s\n", (int) tok.valLen, (char *) tok.val); \
     abort(); \
 } while(0)
 
@@ -685,7 +685,7 @@ static void dumpNode(size_t spcs, SDyn_Node node)
     GGC_PUSH_2(node, children);
 
     for (i = 0; i < spcs; i++) printf("  ");
-    printf("%s: %.*s\n", sdyn_nodeNames[GGC_RD(node, type)], GGC_RD(node, tok).valLen, (char *) GGC_RD(node, tok).val);
+    printf("%s: %.*s\n", sdyn_nodeNames[GGC_RD(node, type)], (int) GGC_RD(node, tok).valLen, (char *) GGC_RD(node, tok).val);
 
     spcs++;
     children = GGC_RP(node, children);

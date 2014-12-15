@@ -382,7 +382,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         default:
             fprintf(stderr, "Unsupported node %s! (%.*s)\n",
-                sdyn_nodeNames[GGC_RD(node, type)], GGC_RD(node, tok).valLen, GGC_RD(node, tok).val);
+                sdyn_nodeNames[GGC_RD(node, type)], (int) GGC_RD(node, tok).valLen, GGC_RD(node, tok).val);
             abort();
     }
 
@@ -677,7 +677,7 @@ static void dumpIR(SDyn_IRNodeArray ir)
                 sdyn_nodeNames[GGC_RD(node, op)],
                 GGC_RD(node, rtype),
                 GGC_RD(node, stype), (unsigned long) GGC_RD(node, addr),
-                (unsigned long) GGC_RD(node, imm), arr->length, arr->a__data,
+                (unsigned long) GGC_RD(node, imm), (int) arr->length, arr->a__data,
                 (unsigned long) GGC_RD(node, left), (unsigned long) GGC_RD(node, right));
     }
 
