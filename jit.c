@@ -20,7 +20,7 @@ int main()
     SDyn_NodeArray children = NULL;
     SDyn_IRNodeArray ir = NULL;
     sdyn_native_function_t func;
-    size_t i;
+    size_t i, addr;
     struct Buffer_char buf;
     const unsigned char *cur;
 
@@ -35,12 +35,50 @@ int main()
 
     pnode = sdyn_parse(cur);
     children = GGC_RP(pnode, children);
+
+    /* output symbols */
+    printf("$$ jit-output\n");
+    addr = 0;
     for (i = 0; i < children->length; i++) {
         cnode = GGC_RAP(children, i);
         if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
+            printf("  %.*s $%lx\n",
+                   (int) GGC_RD(cnode, tok).valLen, (char *) GGC_RD(cnode, tok).val,
+                   (unsigned long) addr);
+            addr += 4096;
+        }
+    }
+    printf("$$\n");
+
+    /* and output data */
+    addr = 0;
+    for (i = 0; i < children->length; i++) {
+        cnode = GGC_RAP(children, i);
+        if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
+            unsigned char *dp;
+            size_t faddr, afaddr, laddr;
+            unsigned char csum;
+
             ir = sdyn_irCompile(cnode, NULL);
             func = sdyn_compile(ir);
-            fwrite((void *) func, 1, 4096, stdout);
+            dp = (unsigned char *) (void *) func;
+
+            for (faddr = 0; faddr < 4096; faddr += 128) {
+                afaddr = addr + faddr;
+                csum = 0x85 +
+                       ((afaddr>>24)&0xFF) +
+                       ((afaddr>>16)&0xFF) +
+                       ((afaddr>>8)&0xFF) +
+                       (afaddr&0xFF);
+                printf("S385%08lX", (unsigned long) (addr + faddr));
+                for (laddr = 0; laddr < 128; laddr++) {
+                    printf("%02X", dp[faddr + laddr]);
+                    csum += dp[faddr + laddr];
+                }
+                printf("%02X\n", (unsigned char) ~csum);
+            }
+
+            addr += 4096;
         }
     }
 
