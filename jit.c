@@ -66,6 +66,7 @@ int main()
     OUTSYM(sdyn_getObjectMemberIndex);
     OUTSYM(sdyn_getObjectMember);
     OUTSYM(sdyn_setObjectMember);
+    OUTSYM(sdyn_add);
     OUTSYM(sdyn_call);
 #undef OUTSYM
 

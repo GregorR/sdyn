@@ -139,6 +139,9 @@ SDyn_Undefined sdyn_getObjectMember(void **pstack, SDyn_Object object, SDyn_Stri
 /* set or add a member on/to an object */
 void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member, SDyn_Undefined value);
 
+/* the ever-complicated add function */
+SDyn_Undefined sdyn_add(void **pstack, SDyn_Undefined left, SDyn_Undefined right);
+
 /* call a function, with JIT compilation */
 SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args);
 

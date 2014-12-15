@@ -34,7 +34,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
     struct Buffer_uchar buf;
     struct Buffer_size_t returns;
     struct SJA_X8664_Operand left, right, third, target;
-    int leftType, rightType, thirdType;
+    int leftType, rightType, thirdType, targetType;
     size_t i, lastArg;
     long imm;
 
@@ -56,6 +56,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
         C2(OR, o1, IMM(imm64&0xFFFFFFFFL)); \
     } \
 } while(0)
+#define IMM64P(o1, v) IMM64(o1, (size_t) (void *) (v))
 #define L(frel)             sja_patchFrel(&buf, (frel))
 
     GGC_PUSH_3(ir, node, onode);
@@ -86,20 +87,20 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 #define BOX(type, targ, reg) do { \
     switch (type) { \
         case SDYN_TYPE_UNDEFINED: \
-            IMM64(RAX, (size_t) (void *) &sdyn_undefined); \
+            IMM64P(RAX, &sdyn_undefined); \
             C2(MOV, targ, MEM(8, RAX, 0, RNONE, 0)); \
             break; \
             \
         case SDYN_TYPE_BOOL: \
             C2(MOV, RSI, reg); \
-            IMM64(RAX, (size_t) (void *) sdyn_boxBool); \
+            IMM64P(RAX, sdyn_boxBool); \
             JCALL(RAX); \
             C2(MOV, targ, RAX); \
             break; \
             \
         case SDYN_TYPE_INT: \
             C2(MOV, RSI, reg); \
-            IMM64(RAX, (size_t) (void *) sdyn_boxInt); \
+            IMM64P(RAX, sdyn_boxInt); \
             JCALL(RAX); \
             C2(MOV, targ, RAX); \
             break; \
@@ -111,6 +112,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
         LOADOP(left, RAX);
         LOADOP(right, RDX);
+        targetType = GGC_RD(node, rtype);
 
         switch (GGC_RD(node, stype)) {
             case SDYN_STORAGE_STK:
@@ -136,8 +138,23 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             case SDYN_NODE_PALLOCA:
-                imm = GGC_RD(node, imm) * 8;
-                C2(SUB, RDI, IMM(imm));
+                imm = GGC_RD(node, imm);
+
+                /* down to the first new word */
+                C2(SUB, RDI, IMM(8));
+
+                /* get undefined to write into the new stack addresses */
+                IMM64P(RAX, &sdyn_undefined);
+                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+
+                /* fill them */
+                C2(MOV, RCX, IMM(imm));
+                C0(STD);
+                C0(REP);
+                C1(STOS, RDI);
+
+                /* and then get back up to the right address */
+                C2(ADD, RDI, IMM(8));
                 break;
 
             case SDYN_NODE_POPA:
@@ -156,36 +173,51 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_PARAM:
+            {
+                size_t nonExist;
+
+                /* because PALLOCA defaults everything to undefined, we don't
+                 * have to default the value. Just check if it's OK */
+                C2(CMP, RSI, IMM(GGC_RD(node, imm)));
+                CF(JLEF, nonExist); /* argument not provided */
+                C2(MOV, RAX, MEM(8, RDX, 0, RNONE, GGC_RD(node, imm)*8)); /* get it from RDX */
+                C2(MOV, target, RAX);
+                L(nonExist);
+
+                break;
+            }
+
             case SDYN_NODE_INTRINSICCALL:
                 C2(MOV, RSI, IMM(lastArg + 1));
                 C2(LEA, RDX, MEM(8, RDI, 0, RNONE, 0));
-                IMM64(RAX, (size_t) (void *) sdyn_getIntrinsic((SDyn_String) GGC_RP(node, immp)));
+                IMM64P(RAX, sdyn_getIntrinsic((SDyn_String) GGC_RP(node, immp)));
                 JCALL(RAX);
                 C2(MOV, target, RAX);
                 break;
 
             case SDYN_NODE_CALL:
                 BOX(leftType, RSI, left);
-                IMM64(RAX, (size_t) (void *) sdyn_assertFunction);
+                IMM64P(RAX, sdyn_assertFunction);
                 JCALL(RAX);
 
                 BOX(leftType, RSI, left);
                 C2(MOV, RDX, IMM(lastArg + 1));
                 C2(LEA, RCX, MEM(8, RDI, 0, RNONE, 0));
-                IMM64(RAX, (size_t) (void *) sdyn_call);
+                IMM64P(RAX, sdyn_call);
                 JCALL(RAX);
                 C2(MOV, target, RAX);
                 break;
 
             /* 0-ary: */
             case SDYN_NODE_TOP:
-                IMM64(RAX, (size_t) (void *) &sdyn_globalObject);
+                IMM64P(RAX, &sdyn_globalObject);
                 C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
                 C2(MOV, target, RAX);
                 break;
 
             case SDYN_NODE_NIL:
-                IMM64(target, (size_t) (void *) &sdyn_undefined);
+                IMM64P(target, &sdyn_undefined);
                 C2(MOV, RAX, MEM(8, target, 0, RNONE, 0));
                 C2(MOV, target, RAX);
                 break;
@@ -221,14 +253,122 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 /* make the string globally accessible */
                 gstring = (SDyn_String *) createPointer();
                 *gstring = GGC_RP(node, immp);
-                IMM64(RDX, (size_t) (void *) gstring);
+                IMM64P(RDX, gstring);
                 C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
 
                 /* get everything into place and call */
-                IMM64(RAX, (size_t) (void *) sdyn_getObjectMember);
+                IMM64P(RAX, sdyn_getObjectMember);
                 JCALL(RAX);
 
                 C2(MOV, target, RAX);
+                break;
+            }
+
+            /* Binary: */
+            case SDYN_NODE_ADD:
+            {
+                /* this is an infinitely complicated melange of type nonsense */
+                if (leftType == rightType) {
+                    /* "easier" case: They're at least the same type */
+                    switch (leftType) {
+                        case SDYN_TYPE_UNDEFINED:
+                            /* let the generic case handle it */
+                            IMM64P(RSI, &sdyn_undefined);
+                            C2(MOV, RSI, MEM(8, RSI, 0, RNONE, 0));
+                            C2(MOV, RDX, RSI);
+                            IMM64P(RAX, sdyn_add);
+                            JCALL(RAX);
+                            break;
+
+                        case SDYN_TYPE_BOOL:
+                            /* box them and then go to the generic case */
+                            C2(MOV, RSI, left);
+                            IMM64P(RAX, sdyn_boxBool);
+                            JCALL(RAX);
+                            C2(MOV, MEM(8, RDI, 0, RNONE, 0), RAX); /* remember boxed left */
+                            C2(MOV, RSI, right);
+                            IMM64P(RAX, sdyn_boxBool);
+                            JCALL(RAX);
+
+                            /* put them in the argument slots */
+                            C2(MOV, RDX, RAX);
+                            C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
+
+                            /* and add */
+                            IMM64P(RAX, sdyn_add);
+                            JCALL(RAX);
+                            break;
+
+                        case SDYN_TYPE_INT:
+                            if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                                /* may as well box now */
+                                C2(MOV, RSI, left);
+                                C2(ADD, RSI, right);
+                                IMM64P(RAX, sdyn_boxInt);
+                                JCALL(RAX);
+
+                            } else {
+                                /* just add! */
+                                C2(MOV, RAX, left);
+                                C2(ADD, RAX, right);
+
+                            }
+                            break;
+
+                        case SDYN_TYPE_BOXED_INT:
+                        {
+                            struct SJA_X8664_Operand tmpTarget = RAX;
+                            if (targetType >= SDYN_TYPE_FIRST_BOXED) tmpTarget = RSI;
+
+                            /* the only boxed case we actually care to unbox */
+                            C2(MOV, tmpTarget, left);
+                            C2(MOV, tmpTarget, MEM(8, RAX, 0, RNONE, 8));
+                            C2(MOV, RDX, right);
+                            C2(ADD, tmpTarget, MEM(8, RDX, 0, RNONE, 8));
+
+                            /* rebox the result if asked */
+                            if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                                IMM64P(RAX, sdyn_boxInt);
+                                JCALL(RAX);
+                            }
+                            break;
+                        }
+
+                        default:
+                            /* something boxed, just count on the generic adder */
+                            C2(MOV, RSI, left);
+                            C2(MOV, RDX, right);
+                            IMM64P(RAX, sdyn_add);
+                            JCALL(RAX);
+                            break;
+                    }
+
+                    C2(MOV, target, RAX);
+
+                } else {
+                    struct SJA_X8664_Operand boxedLeft;
+
+                    /* both sides aren't even the same type, so just box 'em and go */
+                    if (leftType >= SDYN_TYPE_FIRST_BOXED) {
+                        boxedLeft = left;
+                    } else {
+                        boxedLeft = MEM(8, RDI, 0, RNONE, 0);
+                        C2(MOV, RAX, left);
+                        BOX(leftType, RAX, RAX);
+                        C2(MOV, boxedLeft, RAX);
+                    }
+                    if (rightType >= SDYN_TYPE_FIRST_BOXED) {
+                        C2(MOV, RDX, right);
+                    } else {
+                        C2(MOV, RAX, right);
+                        BOX(rightType, RDX, RAX);
+                    }
+                    C2(MOV, RSI, boxedLeft);
+                    IMM64P(RAX, sdyn_add);
+                    JCALL(RAX);
+
+                }
+
                 break;
             }
 

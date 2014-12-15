@@ -599,6 +599,7 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
     }
 
     /* now go through and fix up the stack addresses, allocas and popas to account for the argument stack */
+    if (astkUsed < 2) astkUsed = 2; /* always allocate some play space for pointers */
     pstkUsed += astkUsed;
     for (si = 0; si < ir->length; si++) {
         size_t addr = 0;
