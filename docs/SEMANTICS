@@ -20,7 +20,9 @@ A value of type 'string' is an immutable sequence of ASCII characters. Please
 note that this differs from JavaScript, which specifies strings as Unicode.
 
 A value of type 'object' is a hash table mapping string names to values of any
-type. JavaScript's prototypes are not supported.
+type. It is mutable both in values and keys: i.e., all objects may be extended
+at runtime. JavaScript's prototypes are not supported, and there is also no
+method for deleting keys.
 
 A value of type 'function' is a reference to a piece of code defined by the
 grammar rule 'FunDecl := function ( ParamList ) { Statements }'. Please note
