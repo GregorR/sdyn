@@ -127,6 +127,9 @@ long sdyn_toNumber(void **pstack, SDyn_Undefined value);
 SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value);
 SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value);
 
+/* assertions */
+void sdyn_assertFunction(void **pstack, SDyn_Function func);
+
 /* get the index to which a member belongs in this object, creating one if requested */
 size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String member, int create);
 

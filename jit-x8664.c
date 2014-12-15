@@ -10,6 +10,22 @@
 
 BUFFER(size_t, size_t);
 
+/* utility function to create a pointer that's GC'd */
+static void **createPointer()
+{
+    void **ret = malloc(sizeof(void *));
+    if (ret == NULL) {
+        perror("malloc");
+        abort();
+    }
+
+    *ret = NULL;
+    GGC_PUSH_1(*ret);
+    GGC_GLOBALIZE();
+
+    return ret;
+}
+
 /* compile IR into a native function */
 sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 {
@@ -62,6 +78,11 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
         } \
     } \
 } while(0)
+#define JCALL(what) do { \
+    C2(MOV, MEM(RBP, 0, RNONE, -8), RDI); \
+    C1(CALL, what); \
+    C2(MOV, RDI, MEM(RBP, 0, RNONE, -8)); \
+} while(0)
 #define BOX(type, targ, reg) do { \
     switch (type) { \
         case SDYN_TYPE_UNDEFINED: \
@@ -70,22 +91,21 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             break; \
             \
         case SDYN_TYPE_BOOL: \
-            C2(MOV, MEM(RBP, 0, RNONE, -8), RDI); \
             C2(MOV, RSI, reg); \
             IMM64(RAX, (size_t) (void *) sdyn_boxBool); \
-            C1(CALL, RAX); \
-            C2(MOV, RDI, MEM(RBP, 0, RNONE, -8)); \
+            JCALL(RAX); \
             C2(MOV, targ, RAX); \
             break; \
             \
         case SDYN_TYPE_INT: \
-            C2(MOV, MEM(RBP, 0, RNONE, -8), RDI); \
             C2(MOV, RSI, reg); \
             IMM64(RAX, (size_t) (void *) sdyn_boxInt); \
-            C1(CALL, RAX); \
-            C2(MOV, RDI, MEM(RBP, 0, RNONE, -8)); \
+            JCALL(RAX); \
             C2(MOV, targ, RAX); \
             break; \
+            \
+        default: \
+            C2(MOV, targ, reg); \
     } \
 } while(0)
 
@@ -137,17 +157,33 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             case SDYN_NODE_INTRINSICCALL:
-                /* FIXME: this is all wrong! */
-                C2(MOV, MEM(RBP, 0, RNONE, -8), RDI);
                 C2(MOV, RSI, IMM(lastArg + 1));
                 C2(LEA, RDX, MEM(RDI, 0, RNONE, 0));
                 IMM64(RAX, (size_t) (void *) sdyn_getIntrinsic((SDyn_String) GGC_RP(node, immp)));
-                C1(CALL, RAX);
-                C2(MOV, RDI, MEM(RBP, 0, RNONE, -8));
+                JCALL(RAX);
+                C2(MOV, target, RAX);
+                break;
+
+            case SDYN_NODE_CALL:
+                BOX(leftType, RSI, left);
+                IMM64(RAX, (size_t) (void *) sdyn_assertFunction);
+                JCALL(RAX);
+
+                BOX(leftType, RSI, left);
+                C2(MOV, RDX, IMM(lastArg + 1));
+                C2(LEA, RCX, MEM(RDI, 0, RNONE, 0));
+                IMM64(RAX, (size_t) (void *) sdyn_call);
+                JCALL(RAX);
                 C2(MOV, target, RAX);
                 break;
 
             /* 0-ary: */
+            case SDYN_NODE_TOP:
+                IMM64(RAX, (size_t) (void *) &sdyn_globalObject);
+                C2(MOV, RAX, MEM(RAX, 0, RNONE, 0));
+                C2(MOV, target, RAX);
+                break;
+
             case SDYN_NODE_NIL:
                 IMM64(target, (size_t) (void *) &sdyn_undefined);
                 C2(MOV, RAX, MEM(target, 0, RNONE, 0));
@@ -175,6 +211,26 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 CF(JMPF, *BUFFER_END(returns));
                 returns.bufused++;
                 break;
+
+            case SDYN_NODE_MEMBER:
+            {
+                SDyn_String *gstring;
+
+                BOX(leftType, RSI, left);
+
+                /* make the string globally accessible */
+                gstring = (SDyn_String *) createPointer();
+                *gstring = GGC_RP(node, immp);
+                IMM64(RDX, (size_t) (void *) gstring);
+                C2(MOV, RDX, MEM(RDX, 0, RNONE, 0));
+
+                /* get everything into place and call */
+                IMM64(RAX, (size_t) (void *) sdyn_getObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+            }
 
             default:
                 fprintf(stderr, "Unsupported operation %s!\n", sdyn_nodeNames[GGC_RD(node, op)]);

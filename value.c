@@ -75,8 +75,9 @@ void sdyn_initValues()
     SDyn_ShapeMap esm = NULL;
     SDyn_IndexMap eim = NULL;
     SDyn_UndefinedArray em = NULL;
+    SDyn_Function func = NULL;
 
-    GGC_PUSH_6(tag, number, string, esm, eim, em);
+    GGC_PUSH_7(tag, number, string, esm, eim, em, func);
 
     /* first push them to the global pointer stack */
     pushGlobals();
@@ -124,6 +125,12 @@ void sdyn_initValues()
     GGC_WP(sdyn_globalObject, shape, sdyn_emptyShape);
     em = GGC_NEW_PA(SDyn_Undefined, 0);
     GGC_WP(sdyn_globalObject, members, em);
+
+    /* function */
+    tag = GGC_NEW(SDyn_Tag);
+    GGC_WD(tag, type, SDYN_TYPE_FUNCTION);
+    func = GGC_NEW(SDyn_Function);
+    GGC_WUP(func, tag);
 
     /* so long as we're at it, initialize our pointer stack */
 #define POINTER_STACK_SZ 8388608
@@ -401,6 +408,21 @@ SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value)
     }
 }
 
+/* assertions */
+void sdyn_assertFunction(void **pstack, SDyn_Function func)
+{
+    SDyn_Tag tag = NULL;
+
+    PSTACK();
+    GGC_PUSH_2(func, tag);
+
+    tag = (SDyn_Tag) GGC_RUP(func);
+    if (GGC_RD(tag, type) != SDYN_TYPE_FUNCTION) {
+        fprintf(stderr, "Attempt to call a non-function!\n");
+        abort();
+    }
+}
+
 /* get the index to which a member belongs in this object, creating one if requested */
 size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String member, int create)
 {
@@ -434,6 +456,7 @@ size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String 
     newObjectMembers = GGC_NEW_PA(SDyn_Undefined, ret + 1);
     memcpy(newObjectMembers->a__ptrs, oldObjectMembers->a__ptrs, ret * sizeof(SDyn_Undefined));
     GGC_WAP(newObjectMembers, ret, sdyn_undefined);
+    GGC_WP(object, members, newObjectMembers);
 
     /* check if there's already a defined child with it */
     shapeChildren = GGC_RP(shape, children);

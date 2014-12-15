@@ -43,13 +43,8 @@ int main()
         } else if (GGC_RD(cnode, type) == SDYN_NODE_GLOBALCALL) {
             /* call a global function */
             func = (SDyn_Function) sdyn_getObjectMember(NULL, sdyn_globalObject, name);
-            if (func == (SDyn_Function) sdyn_undefined) {
-                fprintf(stderr, "Global call to undefined function %.*s!\n",
-                        GGC_RD(cnode, tok).valLen, (char *) GGC_RD(cnode, tok).val);
-                abort();
-            } else {
-                sdyn_call(NULL, func, 0, NULL);
-            }
+            sdyn_assertFunction(NULL, func);
+            sdyn_call(NULL, func, 0, NULL);
 
         }
     }
