@@ -297,9 +297,23 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             GGC_WP(irn, immp, name);
 
-            /* and perform the assignment */
             SDyn_IRNodeListPush(ir, irn);
 
+            break;
+
+        case SDYN_NODE_INDEX:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+
+            /* get the object */
+            i = SUB(0);
+            GGC_WD(irn, left, i);
+
+            /* and the index */
+            i = SUB(1);
+            GGC_WD(irn, right, i);
+
+            SDyn_IRNodeListPush(ir, irn);
             break;
 
         case SDYN_NODE_CALL:
@@ -363,12 +377,6 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
         }
 
         /* 0-ary */
-        case SDYN_NODE_OBJ:
-            IRNNEW();
-            GGC_WD(irn, rtype, SDYN_TYPE_OBJECT);
-            SDyn_IRNodeListPush(ir, irn);
-            break;
-
         case SDYN_NODE_NUM:
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_INT);
@@ -387,6 +395,19 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             tok = GGC_RD(node, tok);
             name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
             GGC_WP(irn, immp, name); /* FIXME */
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+
+        case SDYN_NODE_FALSE:
+        case SDYN_NODE_TRUE:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOOL);
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+
+        case SDYN_NODE_OBJ:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_OBJECT);
             SDyn_IRNodeListPush(ir, irn);
             break;
 

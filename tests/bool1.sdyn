@@ -1,0 +1,6 @@
+function main() {
+    $print(true);
+    $print(false);
+}
+
+main();

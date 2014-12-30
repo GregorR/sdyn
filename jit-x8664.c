@@ -214,6 +214,87 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 C2(MOV, target, RAX);
                 break;
 
+            case SDYN_NODE_MEMBER:
+            {
+                SDyn_String *gstring;
+
+                BOX(leftType, RSI, left);
+
+                /* make the string globally accessible */
+                gstring = (SDyn_String *) createPointer();
+                *gstring = GGC_RP(node, immp);
+                IMM64P(RDX, gstring);
+                C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
+
+                /* get everything into place and call */
+                IMM64P(RAX, sdyn_getObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+            }
+
+            case SDYN_NODE_ASSIGNMEMBER:
+            {
+                SDyn_String *gstring;
+
+                BOX(leftType, RSI, left);
+                C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
+
+                BOX(rightType, RCX, right);
+                C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
+
+                /* make the string globally accessible */
+                gstring = (SDyn_String *) createPointer();
+                *gstring = GGC_RP(node, immp);
+                IMM64P(RDX, gstring);
+                C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
+
+                /* get everything into place and call */
+                IMM64P(RAX, sdyn_setObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+            }
+
+            case SDYN_NODE_INDEX:
+                BOX(leftType, RSI, left);
+                C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
+
+                BOX(rightType, RSI, right);
+                IMM64P(RAX, sdyn_toString);
+                JCALL(RAX);
+                C2(MOV, RDX, RAX);
+                C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
+
+                IMM64P(RAX, sdyn_getObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+
+            case SDYN_NODE_ASSIGNINDEX:
+                BOX(leftType, RSI, left);
+                C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
+
+                BOX(rightType, RSI, right);
+                IMM64P(RAX, sdyn_toString);
+                JCALL(RAX);
+                C2(MOV, MEM(8, RDI, 0, RNONE, 8), RAX);
+
+                LOADOP(third, RCX);
+                BOX(thirdType, RCX, third);
+
+                C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
+                C2(MOV, RDX, MEM(8, RDI, 0, RNONE, 8));
+
+                IMM64P(RAX, sdyn_setObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+
             /* 0-ary: */
             case SDYN_NODE_TOP:
                 IMM64P(RAX, &sdyn_globalObject);
@@ -247,6 +328,14 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_FALSE:
+                IMM64(target, 0);
+                break;
+
+            case SDYN_NODE_TRUE:
+                IMM64(target, 1);
+                break;
+
             case SDYN_NODE_OBJ:
                 IMM64P(RAX, sdyn_newObject);
                 JCALL(RAX);
@@ -270,47 +359,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 CF(JMPF, *BUFFER_END(returns));
                 returns.bufused++;
                 break;
-
-            case SDYN_NODE_MEMBER:
-            {
-                SDyn_String *gstring;
-
-                BOX(leftType, RSI, left);
-
-                /* make the string globally accessible */
-                gstring = (SDyn_String *) createPointer();
-                *gstring = GGC_RP(node, immp);
-                IMM64P(RDX, gstring);
-                C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
-
-                /* get everything into place and call */
-                IMM64P(RAX, sdyn_getObjectMember);
-                JCALL(RAX);
-
-                C2(MOV, target, RAX);
-                break;
-            }
-
-            case SDYN_NODE_ASSIGNMEMBER:
-            {
-                SDyn_String *gstring;
-
-                BOX(leftType, RSI, left);
-                BOX(rightType, RCX, right);
-
-                /* make the string globally accessible */
-                gstring = (SDyn_String *) createPointer();
-                *gstring = GGC_RP(node, immp);
-                IMM64P(RDX, gstring);
-                C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
-
-                /* get everything into place and call */
-                IMM64P(RAX, sdyn_setObjectMember);
-                JCALL(RAX);
-
-                C2(MOV, target, RAX);
-                break;
-            }
 
             /* Binary: */
             case SDYN_NODE_ADD:
