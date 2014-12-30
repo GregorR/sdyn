@@ -363,6 +363,15 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SDyn_IRNodeListPush(ir, irn);
             break;
 
+        case SDYN_NODE_STR:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_STRING);
+            tok = GGC_RD(node, tok);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
+            GGC_WP(irn, immp, name); /* FIXME */
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+
         /* unary */
         case SDYN_NODE_RETURN:
             IRNNEW();
@@ -446,7 +455,7 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
     if (vv && !GGC_RAD(irUsed, idx)) { \
         /* it's used here and wasn't already used, so this must be the last use */ \
         last[li++] = vv; \
-        GGC_WAD(irUsed, si, 1); \
+        GGC_WAD(irUsed, idx, 1); \
     } \
 } while(0)
 

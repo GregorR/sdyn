@@ -152,23 +152,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                         C2(MOV, MEM(8, RDI, 0, RNONE, j), RAX);
                 }
 
-#if 0
-                /* down to the first new word */
-                C2(SUB, RDI, IMM(8));
-
-                /* get undefined to write into the new stack addresses */
-                IMM64P(RAX, &sdyn_undefined);
-                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
-
-                /* fill them */
-                C2(MOV, RCX, IMM(imm));
-                C0(STD);
-                C0(REP);
-                C1(STOS, RDI);
-
-                /* and then get back up to the right address */
-                C2(ADD, RDI, IMM(8));
-#endif
                 break;
             }
 
@@ -245,6 +228,21 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             case SDYN_NODE_NUM:
                 C2(MOV, target, IMM(GGC_RD(node, imm)));
                 break;
+
+            case SDYN_NODE_STR:
+            {
+                SDyn_String *gstring;
+
+                /* make the string globally accessible */
+                gstring = (SDyn_String *) createPointer();
+                *gstring = GGC_RP(node, immp);
+
+                /* then simply load it */
+                IMM64P(RAX, gstring);
+                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+                C2(MOV, target, RAX);
+                break;
+            }
 
             /* Unary: */
             case SDYN_NODE_ARG:

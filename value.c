@@ -522,9 +522,40 @@ void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member,
 /* the ever-complicated add function */
 SDyn_Undefined sdyn_add(void **pstack, SDyn_Undefined left, SDyn_Undefined right)
 {
+    SDyn_Tag ltag = NULL, rtag = NULL;
+    SDyn_Number ln = NULL, rn = NULL;
+    SDyn_String ls = NULL, rs = NULL, rets = NULL;
+    GGC_char_Array lsa = NULL, rsa = NULL, retsa = NULL;
+
     PSTACK();
-    /* FIXME: obviously wrong, just temporary */
-    return sdyn_undefined;
+    GGC_PUSH_12(left, right, ltag, rtag, ln, rn, ls, rs, rets, lsa, rsa, retsa);
+
+    ltag = (SDyn_Tag) GGC_RUP(left);
+    rtag = (SDyn_Tag) GGC_RUP(right);
+
+    /* only if both are numbers do we add them as numbers */
+    if (GGC_RD(ltag, type) == SDYN_TYPE_BOXED_INT && GGC_RD(rtag, type) == SDYN_TYPE_BOXED_INT) {
+        long retv;
+        ln = (SDyn_Number) left;
+        rn = (SDyn_Number) right;
+        retv = GGC_RD(ln, value) + GGC_RD(rn, value);
+        return (SDyn_Undefined) sdyn_boxInt(NULL, retv);
+    }
+
+    /* need to convert to strings */
+    ls = sdyn_toString(NULL, left);
+    rs = sdyn_toString(NULL, right);
+    lsa = GGC_RP(ls, value);
+    rsa = GGC_RP(rs, value);
+
+    /* and concatenate them */
+    retsa = GGC_NEW_DA(char, lsa->length + rsa->length);
+    memcpy(retsa->a__data, lsa->a__data, lsa->length);
+    memcpy(retsa->a__data + lsa->length, rsa->a__data, rsa->length);
+    rets = GGC_NEW(SDyn_String);
+    GGC_WP(rets, value, retsa);
+
+    return (SDyn_Undefined) rets;
 }
 
 /* assert that a function is compiled */

@@ -1,9 +1,9 @@
-function sum(a, b) {
-    return a + b;
+function second(a, b) {
+    return b;
 }
 
 function main() {
-    $print(sum(40, 2));
+    $print(second(40, 2));
 }
 
 main();

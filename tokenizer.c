@@ -101,6 +101,7 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
                     len++;
             }
         }
+        if (inp[len] == '"') len++;
 
         /* set up the return */
         ret.type = SDYN_TOKEN_STR;
