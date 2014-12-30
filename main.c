@@ -34,6 +34,7 @@ int main()
         if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
             /* add function to global object */
             func = sdyn_boxFunction(cnode);
+            sdyn_assertCompiled(NULL, func);
             sdyn_setObjectMember(NULL, sdyn_globalObject, name, (SDyn_Undefined) func);
 
         } else if (GGC_RD(cnode, type) == SDYN_NODE_VARDECL) {

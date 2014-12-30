@@ -132,14 +132,23 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             case SDYN_NODE_ALLOCA:
                 imm = GGC_RD(node, imm) + 2;
                 /* must align stack to 16 */
-                if ((imm % 2) == 1) imm++;
+                if ((imm % 2) == 0) imm++;
                 imm *= 8;
-                C2(ENTER, IMM(imm), IMM(0));
+                C1(PUSH, RBP);
+                C2(MOV, RBP, RSP);
+                C2(SUB, RSP, IMM(imm));
                 break;
 
             case SDYN_NODE_PALLOCA:
-                imm = GGC_RD(node, imm);
+            {
+                size_t j;
 
+                imm = GGC_RD(node, imm) * 8;
+                C2(SUB, RDI, IMM(imm));
+                for (j = 0; j < imm; j += 8)
+                    C2(MOV, MEM(8, RDI, 0, RNONE, j), IMM(0));
+
+#if 0
                 /* down to the first new word */
                 C2(SUB, RDI, IMM(8));
 
@@ -155,10 +164,17 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 /* and then get back up to the right address */
                 C2(ADD, RDI, IMM(8));
+#endif
                 break;
+            }
 
             case SDYN_NODE_POPA:
-                C0(LEAVE);
+                imm = GGC_RD(node, imm) + 2;
+                /* must align stack to 16 */
+                if ((imm % 2) == 0) imm++;
+                imm *= 8;
+                C2(ADD, RSP, IMM(imm));
+                C1(POP, RBP);
                 C0(RET);
                 break;
 

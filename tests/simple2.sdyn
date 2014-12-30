@@ -3,7 +3,7 @@ function foo(s) {
 }
 
 function main() {
-    $print(foo(42));
+    foo(42);
 }
 
 main();

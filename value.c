@@ -527,8 +527,8 @@ SDyn_Undefined sdyn_add(void **pstack, SDyn_Undefined left, SDyn_Undefined right
     return sdyn_undefined;
 }
 
-/* call a function, with JIT compilation */
-SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args)
+/* assert that a function is compiled */
+sdyn_native_function_t sdyn_assertCompiled(void **pstack, SDyn_Function func)
 {
     SDyn_IRNodeArray ir = NULL;
     sdyn_native_function_t nfunc;
@@ -549,6 +549,19 @@ SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_U
         nfunc = sdyn_compile(ir);
         GGC_WD(func, value, nfunc);
     }
+
+    return nfunc;
+}
+
+/* call a function, with JIT compilation */
+SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args)
+{
+    sdyn_native_function_t nfunc;
+
+    PSTACK();
+    GGC_PUSH_1(func);
+
+    nfunc = sdyn_assertCompiled(NULL, func);
 
     return nfunc(ggc_jitPointerStack, argCt, args);
 }

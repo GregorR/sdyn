@@ -142,6 +142,9 @@ void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member,
 /* the ever-complicated add function */
 SDyn_Undefined sdyn_add(void **pstack, SDyn_Undefined left, SDyn_Undefined right);
 
+/* assert that a function is compiled */
+sdyn_native_function_t sdyn_assertCompiled(void **pstack, SDyn_Function func);
+
 /* call a function, with JIT compilation */
 SDyn_Undefined sdyn_call(void **pstack, SDyn_Function func, size_t argCt, SDyn_Undefined *args);
 
