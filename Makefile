@@ -1,7 +1,7 @@
 CC=gcc
 ECFLAGS=-g
-CFLAGS=-Ih -I../ggggc -I../smalljitasm $(ECFLAGS)
-LIBS=../ggggc/libggggc.a ../smalljitasm/libsmalljitasm.a -pthread
+CFLAGS=-Ih -Iggggc -Ismalljitasm $(ECFLAGS)
+LIBS=ggggc/libggggc.a smalljitasm/libsmalljitasm.a -pthread
 
 OBJS=\
     tokenizer.o \
@@ -21,11 +21,19 @@ all: sdyn
 
 extras: sdyn $(EXTRAS)
 
-sdyn: $(OBJS) main.o
+sdyn: $(OBJS) main.o $(LIBS)
 	$(CC) $(CFLAGS) $(OBJS) main.o $(LIBS) -o $@
 
-test-%: $(OBJS) %-test.o
+test-%: $(OBJS) %-test.o $(LIBS)
 	$(CC) $(CFLAGS) $(filter-out $*.o,$(OBJS)) $*-test.o $(LIBS) -o $@
+
+ggggc/libggggc.a:
+	cd ggggc ; $(MAKE)
+
+smalljitasm/libsmalljitasm.a:
+	cd smalljitasm ; $(MAKE)
+
+-pthread:
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
