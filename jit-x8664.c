@@ -1,3 +1,35 @@
+/* On x86_64:
+ *  All JIT code conforms to the Unix calling convention.
+ *
+ *  By the Unix calling convention, the first four arguments go in RDI, RSI,
+ *  RDX, RCX, the return goes in RAX, RSP is the stack pointer and RBP is the
+ *  frame pointer. We use ONLY these registers. RSP must be 16-bit aligned.
+ *
+ *  RDI is used as the second (collected pointer) stack. RDI will never be
+ *  overwritten by a JIT function, but MAY be overwritten by a normal function,
+ *  so calls to normal functions must save RDI on the conventional stack (RSP)
+ *  and restore it. All functions are guaranteed to preserve RSP and RBP.
+ *  Normal functions intended to be called by the JIT take the pointer stack as
+ *  their first argument, and so the JIT is never responsible for communicating
+ *  it to the GC.
+ *
+ *  JIT functions themselves take RDI as the pointer stack, RSI as the number
+ *  of arguments, and RDX as the argument array. All arguments must be boxed,
+ *  and thus RDX is frequently (but not necessarily) a region within the
+ *  pointer stack as well. If RSI is 0, RDX may be 0. JIT functions must
+ *  restore RDI to its former value before returning to the caller.
+ *
+ *  When a JIT function initializes, its conventional stack space is not
+ *  initialized (i.e., it's garbage), but its pointer stack space must be, and
+ *  is initialized to many pointers to sdyn_undefined.
+ *
+ *  0(RDI) and 8(RDI) are reserved for temporary collected pointer use.
+ *  -16(RBP) and -8(RBP) are reserved for temporary non-collected or
+ *  non-pointer use. Arguments begin at 16(RDI), and storage begins at
+ *  16+x(RDI), where x is the maximum number of arguments times the word size
+ *  (8).
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
