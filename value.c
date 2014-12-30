@@ -201,6 +201,51 @@ SDyn_String sdyn_boxString(void **pstack, char *value, size_t len)
     return ret;
 }
 
+/* and a specialized boxer for quoted strings */
+SDyn_String sdyn_unquote(SDyn_String istr)
+{
+    SDyn_String ret = NULL;
+    GGC_char_Array ia = NULL, reta = NULL;
+    size_t i, o;
+
+    GGC_PUSH_4(istr, ret, ia, reta);
+
+    ia = GGC_RP(istr, value);
+    reta = GGC_NEW_DA(char, ia->length);
+
+    /* just look for escapes */
+    for (i = 1, o = 0;
+         i < ia->length - 1;
+         i++) {
+        char co = GGC_RAD(ia, i);
+        if (co == '\\') {
+            /* an escape */
+            co = GGC_RAD(ia, i);
+            i++;
+            switch (co) {
+                case 'n':
+                    co = '\n';
+                    break;
+
+                case 'r':
+                    co = '\r';
+                    break;
+            }
+
+        }
+
+        GGC_WAD(reta, o, co);
+        o++;
+    }
+    reta->length = o;
+
+    /* then box it up */
+    ret = GGC_NEW(SDyn_String);
+    GGC_WP(ret, value, reta);
+
+    return ret;
+}
+
 /* coerce to boolean */
 int sdyn_toBoolean(void **pstack, SDyn_Undefined value)
 {

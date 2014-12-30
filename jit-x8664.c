@@ -236,6 +236,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 /* make the string globally accessible */
                 gstring = (SDyn_String *) createPointer();
                 *gstring = GGC_RP(node, immp);
+                *gstring = sdyn_unquote(*gstring);
 
                 /* then simply load it */
                 IMM64P(RAX, gstring);

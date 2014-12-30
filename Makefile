@@ -42,4 +42,9 @@ smalljitasm/libsmalljitasm.a:
 	$(CC) $(CFLAGS) -DUSE_SDYN_`echo "$*" | tr '[a-z]' '[A-Z]'`_TEST -c $*.c -o $*-test.o
 
 clean:
-	rm -f sdyn $(EXTRAS) *.o
+	rm -f sdyn $(EXTRAS) *.o deps
+
+include deps
+
+deps:
+	-$(CC) -Ih -Iggggc -Ismalljitasm -MM *.c > deps

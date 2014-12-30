@@ -121,6 +121,9 @@ SDyn_Number sdyn_boxInt(void **pstack, long value);
 /* simple boxer for strings */
 SDyn_String sdyn_boxString(void **pstack, char *value, size_t len);
 
+/* and a specialized boxer for quoted strings */
+SDyn_String sdyn_unquote(SDyn_String istr);
+
 /* type coercions */
 int sdyn_toBoolean(void **pstack, SDyn_Undefined value);
 long sdyn_toNumber(void **pstack, SDyn_Undefined value);
