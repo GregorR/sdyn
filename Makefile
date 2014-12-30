@@ -1,6 +1,6 @@
 CC=gcc
 ECFLAGS=-g
-CFLAGS=-I../ggggc -I../smalljitasm $(ECFLAGS)
+CFLAGS=-Ih -I../ggggc -I../smalljitasm $(ECFLAGS)
 LIBS=../ggggc/libggggc.a ../smalljitasm/libsmalljitasm.a -pthread
 
 OBJS=\
@@ -17,11 +17,11 @@ EXTRAS=\
     test-ir \
     test-jit
 
-all: jsdyn
+all: sdyn
 
-extras: jsdyn $(EXTRAS)
+extras: sdyn $(EXTRAS)
 
-jsdyn: $(OBJS) main.o
+sdyn: $(OBJS) main.o
 	$(CC) $(CFLAGS) $(OBJS) main.o $(LIBS) -o $@
 
 test-%: $(OBJS) %-test.o
@@ -34,4 +34,4 @@ test-%: $(OBJS) %-test.o
 	$(CC) $(CFLAGS) -DUSE_SDYN_`echo "$*" | tr '[a-z]' '[A-Z]'`_TEST -c $*.c -o $*-test.o
 
 clean:
-	rm -f $(ALL) $(EXTRAS) *.o
+	rm -f sdyn $(EXTRAS) *.o
