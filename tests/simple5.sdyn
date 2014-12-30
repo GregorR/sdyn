@@ -3,7 +3,7 @@ function sum(a, b) {
 }
 
 function main() {
-    $print(sum(40, 2));
+    $print(sum(sum(1, 2), sum(3, 4)));
 }
 
 main();
