@@ -74,7 +74,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
         onode = GGC_RAP(ir, GGC_RD(onode, uidx)); \
         if (GGC_RD(onode, stype) == SDYN_STORAGE_PSTK) { \
             opa = defreg; \
-            C2(MOV, defreg, MEM(8, RDI, 0, RNONE, GGC_RD(onode, addr) * 8)); \
+            C2(MOV, defreg, MEM(8, RDI, 0, RNONE, GGC_RD(onode, addr) * 8 + 16)); \
         } else if (GGC_RD(onode, stype) == SDYN_STORAGE_STK) { \
             opa = defreg; \
             C2(MOV, defreg, MEM(8, RSP, 0, RNONE, GGC_RD(onode, addr) * 8)); \
@@ -123,7 +123,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             case SDYN_STORAGE_ASTK:
             case SDYN_STORAGE_PSTK:
-                target = MEM(8, RDI, 0, RNONE, GGC_RD(node, addr)*8);
+                target = MEM(8, RDI, 0, RNONE, GGC_RD(node, addr)*8 + 16);
                 break;
 
             default:
@@ -145,14 +145,12 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             {
                 size_t j;
 
-                imm = GGC_RD(node, imm) * 8;
-                if (imm > 0) {
-                    C2(SUB, RDI, IMM(imm));
-                    IMM64P(RAX, &sdyn_undefined);
-                    C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
-                    for (j = 0; j < imm; j += 8)
-                        C2(MOV, MEM(8, RDI, 0, RNONE, j), RAX);
-                }
+                imm = GGC_RD(node, imm) * 8 + 16;
+                C2(SUB, RDI, IMM(imm));
+                IMM64P(RAX, &sdyn_undefined);
+                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+                for (j = 0; j < imm; j += 8)
+                    C2(MOV, MEM(8, RDI, 0, RNONE, j), RAX);
 
                 break;
             }
@@ -173,7 +171,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 /* fix up all the forward references */
                 for (j = 0; j < returns.bufused; j++)
                     sja_patchFrel(&buf, returns.buf[j]);
-                imm = GGC_RD(node, imm) * 8;
+                imm = GGC_RD(node, imm) * 8 + 16;
                 C2(ADD, RDI, IMM(imm));
                 break;
             }
@@ -195,7 +193,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             case SDYN_NODE_INTRINSICCALL:
                 C2(MOV, RSI, IMM(lastArg + 1));
-                C2(LEA, RDX, MEM(8, RDI, 0, RNONE, 0));
+                C2(LEA, RDX, MEM(8, RDI, 0, RNONE, 16));
                 IMM64P(RAX, sdyn_getIntrinsic((SDyn_String) GGC_RP(node, immp)));
                 JCALL(RAX);
                 C2(MOV, target, RAX);
@@ -208,7 +206,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 BOX(leftType, RSI, left);
                 C2(MOV, RDX, IMM(lastArg + 1));
-                C2(LEA, RCX, MEM(8, RDI, 0, RNONE, 0));
+                C2(LEA, RCX, MEM(8, RDI, 0, RNONE, 16));
                 IMM64P(RAX, sdyn_call);
                 JCALL(RAX);
                 C2(MOV, target, RAX);

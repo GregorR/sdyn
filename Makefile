@@ -43,7 +43,7 @@ test: sdyn
 	mkdir -p tests/results
 	for i in $(TESTS) ; do \
 	    ./sdyn < tests/$$i.sdyn > tests/results/$$i || break; \
-	    cmp tests/results/$$i tests/correct/$$i || break; \
+	    diff tests/results/$$i tests/correct/$$i || break; \
 	done
 
 %.o: %.c
