@@ -112,6 +112,9 @@ SDyn_Function sdyn_boxFunction(SDyn_Node ast);
 
 /* the remaining functions are intended to be called by the JIT */
 
+/* create an object */
+SDyn_Object sdyn_newObject(void **pstack);
+
 /* simple boxer for bool */
 SDyn_Boolean sdyn_boxBool(void **pstack, int value);
 

@@ -284,6 +284,24 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
         }
 
+        case SDYN_NODE_MEMBER:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+
+            /* get the object */
+            i = SUB(0);
+            GGC_WD(irn, left, i);
+
+            /* the name is the token */
+            tok = GGC_RD(node, tok);
+            name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
+            GGC_WP(irn, immp, name);
+
+            /* and perform the assignment */
+            SDyn_IRNodeListPush(ir, irn);
+
+            break;
+
         case SDYN_NODE_CALL:
         {
             size_t f;

@@ -159,6 +159,23 @@ SDyn_Function sdyn_boxFunction(SDyn_Node ast)
     if (pstack) ggc_jitPointerStack = pstack; \
 } while(0)
 
+/* create an object */
+SDyn_Object sdyn_newObject(void **pstack)
+{
+    SDyn_Object ret = NULL;
+    SDyn_UndefinedArray members = NULL;
+
+    PSTACK();
+    GGC_PUSH_2(ret, members);
+
+    ret = GGC_NEW(SDyn_Object);
+    members = GGC_NEW_PA(SDyn_Undefined, 0);
+    GGC_WP(ret, members, members);
+    GGC_WP(ret, shape, sdyn_emptyShape);
+
+    return ret;
+}
+
 /* simple boxer for bool */
 SDyn_Boolean sdyn_boxBool(void **pstack, int value)
 {

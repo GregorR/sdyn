@@ -1,0 +1,8 @@
+function main() {
+    var x;
+    x = {};
+    x.hello = "Hello, world!";
+    $print(x.hello);
+}
+
+main();

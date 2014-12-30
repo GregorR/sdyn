@@ -43,6 +43,8 @@ smalljitasm/libsmalljitasm.a:
 
 clean:
 	rm -f sdyn $(EXTRAS) *.o deps
+	cd ggggc ; $(MAKE) clean
+	cd smalljitasm ; $(MAKE) clean
 
 include deps
 

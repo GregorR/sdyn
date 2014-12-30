@@ -35,7 +35,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
     struct Buffer_size_t returns;
     struct SJA_X8664_Operand left, right, third, target;
     int leftType, rightType, thirdType, targetType;
-    size_t i, lastArg;
+    size_t i, lastArg, unsuppCount;
     long imm;
 
     INIT_BUFFER(buf);
@@ -60,6 +60,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 #define L(frel)             sja_patchFrel(&buf, (frel))
 
     GGC_PUSH_3(ir, node, onode);
+
+    unsuppCount = 0;
 
     lastArg = 0;
     for (i = 0; i < ir->length; i++) {
@@ -245,6 +247,12 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_OBJ:
+                IMM64P(RAX, sdyn_newObject);
+                JCALL(RAX);
+                C2(MOV, target, RAX);
+                break;
+
             /* Unary: */
             case SDYN_NODE_ARG:
                 lastArg = GGC_RD(node, imm);
@@ -277,6 +285,27 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 /* get everything into place and call */
                 IMM64P(RAX, sdyn_getObjectMember);
+                JCALL(RAX);
+
+                C2(MOV, target, RAX);
+                break;
+            }
+
+            case SDYN_NODE_ASSIGNMEMBER:
+            {
+                SDyn_String *gstring;
+
+                BOX(leftType, RSI, left);
+                BOX(rightType, RCX, right);
+
+                /* make the string globally accessible */
+                gstring = (SDyn_String *) createPointer();
+                *gstring = GGC_RP(node, immp);
+                IMM64P(RDX, gstring);
+                C2(MOV, RDX, MEM(8, RDX, 0, RNONE, 0));
+
+                /* get everything into place and call */
+                IMM64P(RAX, sdyn_setObjectMember);
                 JCALL(RAX);
 
                 C2(MOV, target, RAX);
@@ -393,8 +422,11 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             default:
                 fprintf(stderr, "Unsupported operation %s!\n", sdyn_nodeNames[GGC_RD(node, op)]);
+                unsuppCount++;
         }
     }
+
+    if (unsuppCount) abort();
 
     /* now transfer it to executable memory */
     {
