@@ -17,6 +17,10 @@ EXTRAS=\
     test-ir \
     test-jit
 
+TESTS=\
+	bool1 obj1 obj2 obj3 obj4 simple1 simple2 simple3 simple4 sum1 sum2 \
+	sum3
+
 all: sdyn
 
 extras: sdyn $(EXTRAS)
@@ -35,6 +39,13 @@ smalljitasm/libsmalljitasm.a:
 
 -pthread:
 
+test: sdyn
+	mkdir -p tests/results
+	for i in $(TESTS) ; do \
+	    ./sdyn < tests/$$i.sdyn > tests/results/$$i || break; \
+	    cmp tests/results/$$i tests/correct/$$i || break; \
+	done
+
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -43,6 +54,7 @@ smalljitasm/libsmalljitasm.a:
 
 clean:
 	rm -f sdyn $(EXTRAS) *.o deps
+	rm -rf tests/results
 	cd ggggc ; $(MAKE) clean
 	cd smalljitasm ; $(MAKE) clean
 
