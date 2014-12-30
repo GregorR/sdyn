@@ -1,0 +1,9 @@
+function foo(s) {
+    return s;
+}
+
+function main() {
+    $print(foo(42));
+}
+
+main();
