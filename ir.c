@@ -87,6 +87,8 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
         case SDYN_NODE_PARAMS:
             /* simple list */
             for (i = 0; i < children->length; i++) {
+                size_t paramIdx;
+
                 cnode = GGC_RAP(children, i);
 
                 tok = GGC_RD(cnode, tok);
@@ -94,8 +96,8 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
                 /* add it to the symbol table */
                 indexBox = GGC_NEW(GGC_size_t_Unit);
-                i = GGC_RD(ir, length);
-                GGC_WD(indexBox, v, i);
+                paramIdx = GGC_RD(ir, length);
+                GGC_WD(indexBox, v, paramIdx);
                 SDyn_IndexMapPut(symbols, name, indexBox);
 
                 /* make the IR node */

@@ -144,9 +144,13 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 size_t j;
 
                 imm = GGC_RD(node, imm) * 8;
-                C2(SUB, RDI, IMM(imm));
-                for (j = 0; j < imm; j += 8)
-                    C2(MOV, MEM(8, RDI, 0, RNONE, j), IMM(0));
+                if (imm > 0) {
+                    C2(SUB, RDI, IMM(imm));
+                    IMM64P(RAX, &sdyn_undefined);
+                    C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+                    for (j = 0; j < imm; j += 8)
+                        C2(MOV, MEM(8, RDI, 0, RNONE, j), RAX);
+                }
 
 #if 0
                 /* down to the first new word */
