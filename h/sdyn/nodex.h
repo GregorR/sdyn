@@ -22,7 +22,8 @@ SDYN_NODEX(STATEMENTS)  /*  list                    unused          */
 SDYN_NODEX(IF)          /*  - [Expression, Statements, ElseClause]
                                                     TBD             */
 SDYN_NODEX(WHILE)       /*  - [Expression, Statements]
-                                                    TBD             */
+                                                    just marks the beginning of
+                                                    a loop */
 SDYN_NODEX(RETURN)      /*  - [Expression]          l:Expression    */
 SDYN_NODEX(ASSIGN)      /*  - [LVal, Expression]    unused          */
 
@@ -73,6 +74,11 @@ SDYN_NODEX(OBJ)         /*  - []                    eval to new object */
 SDYN_NODEX(UNIFY)           /* unify two values
                                l:value 1
                                r:value 2 */
+
+/* with while loops, WHILE is the start, WCOND is the condition, and WEND is the end */
+SDYN_NODEX(WCOND)
+SDYN_NODEX(WEND)
+
 SDYN_NODEX(ALLOCA)          /* allocates space. Always the first instruction.
                                Updated by register allocation to be able to
                                spill. i:Number of words to reserve */
@@ -83,6 +89,7 @@ SDYN_NODEX(POPA)            /* pops space allocated by ALLOCA. Always the last
                                instruction */
 SDYN_NODEX(PPOPA)           /* pops space allocated by PALLOCA. Always the
                                second-to-last instruction */
+
 SDYN_NODEX(ASSIGNINDEX)     /* x[y]=z
                                l:x
                                r:y
@@ -91,6 +98,7 @@ SDYN_NODEX(ASSIGNMEMBER)    /* x.y=z
                                s:y
                                l:x
                                r:z */
+
 SDYN_NODEX(ARG)             /* used implicitly by *CALL
                                i:argument number
                                l:value */

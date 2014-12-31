@@ -212,6 +212,64 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_WHILE:
+            {
+                /* for while we just mark the start, put in imm */
+                size_t wstart;
+                wstart = buf.bufused;
+                GGC_WD(node, imm, wstart);
+                break;
+            }
+
+            case SDYN_NODE_WCOND:
+            {
+                size_t wcond;
+
+                /* first get it to a bool */
+                LOADOP(left, RAX);
+                if (leftType < SDYN_TYPE_FIRST_BOXED &&
+                    leftType != SDYN_TYPE_BOOL) {
+                    /* wrong unboxed type! */
+                    BOX(leftType, RAX, left);
+                    leftType = SDYN_TYPE_BOXED;
+                }
+                if (leftType >= SDYN_TYPE_FIRST_BOXED) {
+                    /* boolify it */
+                    C2(MOV, RSI, RAX);
+                    fprintf(stderr, "wut\n");
+                    IMM64P(RAX, sdyn_toBoolean);
+                    JCALL(RAX);
+                }
+
+                /* now it's ready to check */
+                C2(TEST, RAX, RAX);
+                CF(JEF, wcond);
+                GGC_WD(node, imm, wcond);
+                break;
+            }
+
+            case SDYN_NODE_WEND:
+            {
+                size_t wstart, wcond;
+
+                /* get our wstart and wcond */
+                wstart = GGC_RD(node, left);
+                onode = GGC_RAP(ir, wstart);
+                wstart = GGC_RD(onode, imm);
+
+                wcond = GGC_RD(node, right);
+                onode = GGC_RAP(ir, wcond);
+                wcond = GGC_RD(onode, imm);
+
+                /* just jump back to the beginning */
+                C1(JMPR, RREL(wstart));
+
+                /* then provide the jumping-forward point from the condition */
+                L(wcond);
+
+                break;
+            }
+
             case SDYN_NODE_PARAM:
             {
                 size_t nonExist;
@@ -588,17 +646,17 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                             C2(MOV, RDX, right);
                             IMM64P(RAX, sdyn_add);
                             JCALL(RAX);
-                            break;
                     }
 
                     C2(MOV, target, RAX);
 
                 } else {
                     struct SJA_X8664_Operand boxedLeft;
+                    boxedLeft = MEM(8, RDI, 0, RNONE, 0);
 
                     /* both sides aren't even the same type, so just box 'em and go */
                     if (leftType >= SDYN_TYPE_FIRST_BOXED) {
-                        boxedLeft = left;
+                        C2(MOV, boxedLeft, left);
                     } else {
                         boxedLeft = MEM(8, RDI, 0, RNONE, 0);
                         C2(MOV, RAX, left);
@@ -614,6 +672,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                     C2(MOV, RSI, boxedLeft);
                     IMM64P(RAX, sdyn_add);
                     JCALL(RAX);
+
+                    C2(MOV, target, RAX);
 
                 }
 

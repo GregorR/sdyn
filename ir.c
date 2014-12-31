@@ -238,6 +238,13 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_WHILE:
         {
+            size_t begin, cond;
+
+            /* mark the beginning */
+            IRNNEW();
+            begin = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+
             /* we'll need to compare our symbol table before and after to unify, so first, copy */
             symbols2 = GGC_NEW(SDyn_IndexMap);
             for (i = 0; i < GGC_RD(symbols, size); i++) {
@@ -249,8 +256,20 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             }
 
             /* now do the while */
-            SUB(0); /* NOTE: actually need to unify here to be correct */
+            i = SUB(0); /* NOTE: actually need to unify here to be correct */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_WCOND);
+            GGC_WD(irn, left, i);
+            cond = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+
             SUB(1);
+
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_WEND);
+            GGC_WD(irn, left, begin);
+            GGC_WD(irn, right, cond);
+            SDyn_IRNodeListPush(ir, irn);
 
             /* then unify */
             for (i = 0; i < GGC_RD(symbols2, size); i++) {
