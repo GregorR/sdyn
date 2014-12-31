@@ -691,7 +691,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 size_t after;
 
                 /* get both operands as numbers */
-                intLeft = MEM(8, RBP, 0, RNONE, -8);
+                intLeft = MEM(8, RBP, 0, RNONE, -16);
                 LOADOP(left, RAX);
                 switch (leftType) {
                     case SDYN_TYPE_BOXED_INT:
