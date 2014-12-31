@@ -25,7 +25,9 @@
  *
  *  0(RDI) and 8(RDI) are reserved for temporary collected pointer use.
  *  -16(RBP) and -8(RBP) are reserved for temporary non-collected or
- *  non-pointer use. Arguments begin at 16(RDI), and storage begins at
+ *  non-pointer use. -8(RBP) is generally used to store RDI during calls to
+ *  non-JIT functions, and should be avoided in other cases so there is no
+ *  accidental overlap. Arguments begin at 16(RDI), and storage begins at
  *  16+x(RDI), where x is the maximum number of arguments times the word size
  *  (8).
  */
@@ -491,7 +493,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 size_t after;
 
                 /* get both operands as numbers */
-                intLeft = MEM(8, RBP, 0, RNONE, -8);
+                intLeft = MEM(8, RBP, 0, RNONE, -16);
                 LOADOP(left, RAX);
                 switch (leftType) {
                     case SDYN_TYPE_BOXED_INT:
@@ -522,6 +524,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                         break;
 
                     case SDYN_TYPE_INT:
+                        C2(MOV, RDX, right);
                         break;
 
                     default:

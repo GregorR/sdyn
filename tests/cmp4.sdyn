@@ -1,0 +1,18 @@
+function foo(n) {
+    var i;
+    i = 2;
+    $print(i < n);
+    $print(i > n);
+    $print(i < 10);
+    $print(i > 10);
+    $print(2 < n);
+    $print(2 > n);
+    $print(2 < 10);
+    $print(2 > 10);
+}
+
+function main() {
+    foo(10);
+}
+
+main();

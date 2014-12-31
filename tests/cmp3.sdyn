@@ -1,0 +1,11 @@
+function foo(n) {
+    var i;
+    i = 2;
+    $print(i < n);
+}
+
+function main() {
+    foo(10);
+}
+
+main();
