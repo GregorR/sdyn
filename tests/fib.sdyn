@@ -7,6 +7,7 @@ function fib(n) {
     i = 2;
     while (i < n) {
         c[i] = c[i-2] + c[i-1];
+        $print(i);
         i = i + 1;
     }
     return c[n-1];

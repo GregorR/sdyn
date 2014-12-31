@@ -264,6 +264,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                             /* they both have different indexes, must unify */
                             irn = GGC_NEW(SDyn_IRNode);
                             GGC_WD(irn, op, SDYN_NODE_UNIFY);
+                            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
                             idx = GGC_RD(indexBox, v);
                             GGC_WD(irn, left, idx);
                             idx = GGC_RD(indexBox2, v);
@@ -436,6 +437,16 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
         case SDYN_NODE_ADD:
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            i = SUB(0);
+            GGC_WD(irn, left, i);
+            i = SUB(1);
+            GGC_WD(irn, right, i);
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+
+        case SDYN_NODE_SUB:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_INT);
             i = SUB(0);
             GGC_WD(irn, left, i);
             i = SUB(1);

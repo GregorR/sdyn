@@ -61,13 +61,13 @@ static void **createPointer()
 /* compile IR into a native function */
 sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 {
-    SDyn_IRNode node = NULL, onode = NULL;
+    SDyn_IRNode node = NULL, unode = NULL, onode = NULL;
     sdyn_native_function_t ret = NULL;
     struct Buffer_uchar buf;
     struct Buffer_size_t returns;
     struct SJA_X8664_Operand left, right, third, target;
     int leftType, rightType, thirdType, targetType;
-    size_t i, lastArg, unsuppCount;
+    size_t i, uidx, lastArg, unsuppCount;
     long imm;
 
     INIT_BUFFER(buf);
@@ -91,19 +91,27 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 #define IMM64P(o1, v) IMM64(o1, (size_t) (void *) (v))
 #define L(frel)             sja_patchFrel(&buf, (frel))
 
-    GGC_PUSH_3(ir, node, onode);
+    GGC_PUSH_4(ir, node, unode, onode);
 
     unsuppCount = 0;
 
     lastArg = 0;
     for (i = 0; i < ir->length; i++) {
         node = GGC_RAP(ir, i);
+        unode = node;
+
+        uidx = i;
+        while (GGC_RD(unode, uidx) != uidx) {
+            uidx = GGC_RD(unode, uidx);
+            unode = GGC_RAP(ir, uidx);
+        }
+        targetType = GGC_RD(unode, rtype);
 
 #define LOADOP(opa, defreg) do { \
     if (GGC_RD(node, opa)) { \
         onode = GGC_RAP(ir, GGC_RD(node, opa)); \
-        opa ## Type = GGC_RD(onode, rtype); \
         onode = GGC_RAP(ir, GGC_RD(onode, uidx)); \
+        opa ## Type = GGC_RD(onode, rtype); \
         if (GGC_RD(onode, stype) == SDYN_STORAGE_PSTK) { \
             opa = defreg; \
             C2(MOV, defreg, MEM(8, RDI, 0, RNONE, GGC_RD(onode, addr) * 8 + 16)); \
@@ -345,6 +353,12 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             case SDYN_NODE_NUM:
                 C2(MOV, target, IMM(GGC_RD(node, imm)));
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    C2(MOV, RSI, target);
+                    IMM64P(RAX, &sdyn_boxInt);
+                    JCALL(RAX);
+                    C2(MOV, target, RAX);
+                }
                 break;
 
             case SDYN_NODE_STR:
@@ -364,11 +378,21 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             }
 
             case SDYN_NODE_FALSE:
-                IMM64(target, 0);
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    IMM64P(target, &sdyn_false);
+                    C2(MOV, target, MEM(8, target, 0, RNONE, 0));
+                } else {
+                    IMM64(target, 0);
+                }
                 break;
 
             case SDYN_NODE_TRUE:
-                IMM64(target, 1);
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    IMM64P(target, &sdyn_true);
+                    C2(MOV, target, MEM(8, target, 0, RNONE, 0));
+                } else {
+                    IMM64(target, 1);
+                }
                 break;
 
             case SDYN_NODE_OBJ:
@@ -398,6 +422,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             /* Binary: */
+
+            /* (number, number) -> boolean */
             case SDYN_NODE_LT:
             case SDYN_NODE_GT:
             case SDYN_NODE_LE:
@@ -472,11 +498,19 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 /* and return */
                 L(after);
+
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    C2(MOV, RSI, RAX);
+                    IMM64P(RAX, sdyn_boxBool);
+                    JCALL(RAX);
+                }
+
                 C2(MOV, target, RAX);
 
                 break;
             }
 
+            /* the infamous add */
             case SDYN_NODE_ADD:
             {
                 /* this is an infinitely complicated melange of type nonsense */
@@ -585,6 +619,78 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 break;
             }
+
+
+            /* (number, number) -> number */
+            case SDYN_NODE_SUB:
+            {
+                struct SJA_X8664_Operand intLeft;
+                size_t after;
+
+                /* get both operands as numbers */
+                intLeft = MEM(8, RBP, 0, RNONE, -8);
+                LOADOP(left, RAX);
+                switch (leftType) {
+                    case SDYN_TYPE_BOXED_INT:
+                        C2(MOV, RAX, MEM(8, left, 0, RNONE, 8));
+                        C2(MOV, intLeft, RAX);
+                        break;
+
+                    case SDYN_TYPE_INT:
+                        C2(MOV, intLeft, left);
+                        break;
+
+                    default:
+                        if (leftType < SDYN_TYPE_FIRST_BOXED) {
+                            BOX(leftType, RSI, left);
+                        } else {
+                            C2(MOV, RSI, left);
+                        }
+                        IMM64P(RAX, sdyn_toNumber);
+                        JCALL(RAX);
+                        C2(MOV, intLeft, RAX);
+                        break;
+                }
+
+                LOADOP(right, RDX);
+                switch (rightType) {
+                    case SDYN_TYPE_BOXED_INT:
+                        C2(MOV, RDX, MEM(8, right, 0, RNONE, 8));
+                        break;
+
+                    case SDYN_TYPE_INT:
+                        break;
+
+                    default:
+                        if (rightType < SDYN_TYPE_FIRST_BOXED) {
+                            BOX(rightType, RSI, right);
+                        } else {
+                            C2(MOV, RSI, right);
+                        }
+                        IMM64P(RAX, sdyn_toNumber);
+                        JCALL(RAX);
+                        C2(MOV, RDX, RAX);
+                        break;
+                }
+                C2(MOV, RAX, intLeft);
+
+                /* do the appropriate operation */
+                switch (GGC_RD(node, op)) {
+                    case SDYN_NODE_SUB: C2(SUB, RAX, RDX); break;
+                }
+
+                /* and return */
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    C2(MOV, RSI, RAX);
+                    IMM64P(RAX, sdyn_boxInt);
+                    JCALL(RAX);
+                }
+                C2(MOV, target, RAX);
+
+                break;
+            }
+
+            case SDYN_NODE_UNIFY: break;
 
             default:
                 fprintf(stderr, "Unsupported operation %s!\n", sdyn_nodeNames[GGC_RD(node, op)]);
