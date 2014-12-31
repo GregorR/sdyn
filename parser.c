@@ -432,7 +432,7 @@ BINARY_HEAD(RelExp, AddExp)
     BINARY(LT, LT, AddExp)
     BINARY(GT, GT, AddExp)
     BINARY(LE, LE, AddExp)
-    BINARY(LE, LE, AddExp)
+    BINARY(GE, GE, AddExp)
 BINARY_TAIL
 
 BINARY_HEAD(AddExp, MulExp)

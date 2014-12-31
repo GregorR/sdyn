@@ -420,6 +420,19 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         /* binary */
+        case SDYN_NODE_LT:
+        case SDYN_NODE_GT:
+        case SDYN_NODE_LE:
+        case SDYN_NODE_GE:
+            IRNNEW();
+            GGC_WD(irn, rtype, SDYN_TYPE_BOOL);
+            i = SUB(0);
+            GGC_WD(irn, left, i);
+            i = SUB(1);
+            GGC_WD(irn, right, i);
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+
         case SDYN_NODE_ADD:
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_BOXED);

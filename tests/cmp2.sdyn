@@ -1,0 +1,19 @@
+function main() {
+    $print(42 < 48);
+    $print(42 < 42);
+    $print(42 < 24);
+
+    $print(42 <= 48);
+    $print(42 <= 42);
+    $print(42 <= 24);
+
+    $print(42 > 48);
+    $print(42 > 42);
+    $print(42 > 24);
+
+    $print(42 >= 48);
+    $print(42 >= 42);
+    $print(42 >= 24);
+}
+
+main();

@@ -1,0 +1,5 @@
+function main() {
+    $print(42 < 48);
+}
+
+main();

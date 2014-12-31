@@ -144,10 +144,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
     } \
 } while(0)
 
-        LOADOP(left, RAX);
-        LOADOP(right, RDX);
-        targetType = GGC_RD(node, rtype);
-
         switch (GGC_RD(node, stype)) {
             case SDYN_STORAGE_STK:
                 target = MEM(8, RSP, 0, RNONE, GGC_RD(node, addr)*8);
@@ -232,11 +228,13 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             case SDYN_NODE_CALL:
+                LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
+                C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
                 IMM64P(RAX, sdyn_assertFunction);
                 JCALL(RAX);
 
-                BOX(leftType, RSI, left);
+                C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
                 C2(MOV, RDX, IMM(lastArg + 1));
                 C2(LEA, RCX, MEM(8, RDI, 0, RNONE, 16));
                 IMM64P(RAX, sdyn_call);
@@ -248,6 +246,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             {
                 SDyn_String *gstring;
 
+                LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
 
                 /* make the string globally accessible */
@@ -268,9 +267,11 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             {
                 SDyn_String *gstring;
 
+                LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
                 C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
 
+                LOADOP(right, RAX);
                 BOX(rightType, RCX, right);
                 C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
 
@@ -289,9 +290,11 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             }
 
             case SDYN_NODE_INDEX:
+                LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
                 C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
 
+                LOADOP(right, RAX);
                 BOX(rightType, RSI, right);
                 IMM64P(RAX, sdyn_toString);
                 JCALL(RAX);
@@ -305,9 +308,11 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             case SDYN_NODE_ASSIGNINDEX:
+                LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
                 C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
 
+                LOADOP(right, RAX);
                 BOX(rightType, RSI, right);
                 IMM64P(RAX, sdyn_toString);
                 JCALL(RAX);
@@ -377,11 +382,13 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 lastArg = GGC_RD(node, imm);
 
                 /* arguments must be boxed */
+                LOADOP(left, RAX);
                 BOX(leftType, target, left);
                 break;
 
             case SDYN_NODE_RETURN:
                 /* returns must be boxed */
+                LOADOP(left, RAX);
                 BOX(leftType, RAX, left);
 
                 /* jump to the return address */
@@ -391,9 +398,90 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
 
             /* Binary: */
+            case SDYN_NODE_LT:
+            case SDYN_NODE_GT:
+            case SDYN_NODE_LE:
+            case SDYN_NODE_GE:
+            {
+                struct SJA_X8664_Operand intLeft;
+                size_t after;
+
+                /* get both operands as numbers */
+                intLeft = MEM(8, RBP, 0, RNONE, -8);
+                LOADOP(left, RAX);
+                switch (leftType) {
+                    case SDYN_TYPE_BOXED_INT:
+                        C2(MOV, RAX, MEM(8, left, 0, RNONE, 8));
+                        C2(MOV, intLeft, RAX);
+                        break;
+
+                    case SDYN_TYPE_INT:
+                        C2(MOV, intLeft, left);
+                        break;
+
+                    default:
+                        if (leftType < SDYN_TYPE_FIRST_BOXED) {
+                            BOX(leftType, RSI, left);
+                        } else {
+                            C2(MOV, RSI, left);
+                        }
+                        IMM64P(RAX, sdyn_toNumber);
+                        JCALL(RAX);
+                        C2(MOV, intLeft, RAX);
+                        break;
+                }
+
+                LOADOP(right, RDX);
+                switch (rightType) {
+                    case SDYN_TYPE_BOXED_INT:
+                        C2(MOV, RDX, MEM(8, right, 0, RNONE, 8));
+                        break;
+
+                    case SDYN_TYPE_INT:
+                        break;
+
+                    default:
+                        if (rightType < SDYN_TYPE_FIRST_BOXED) {
+                            BOX(rightType, RSI, right);
+                        } else {
+                            C2(MOV, RSI, right);
+                        }
+                        IMM64P(RAX, sdyn_toNumber);
+                        JCALL(RAX);
+                        C2(MOV, RDX, RAX);
+                        break;
+                }
+                C2(MOV, RSI, intLeft);
+
+                /* load true */
+                C2(MOV, RAX, IMM(1));
+
+                /* now compare them */
+                C2(CMP, RSI, RDX);
+
+                /* do the appropriate jump */
+                switch (GGC_RD(node, op)) {
+                    case SDYN_NODE_LT: CF(JLF, after); break;
+                    case SDYN_NODE_GT: CF(JGF, after); break;
+                    case SDYN_NODE_LE: CF(JLEF, after); break;
+                    case SDYN_NODE_GE: CF(JGEF, after); break;
+                }
+
+                /* load false */
+                C2(MOV, RAX, IMM(0));
+
+                /* and return */
+                L(after);
+                C2(MOV, target, RAX);
+
+                break;
+            }
+
             case SDYN_NODE_ADD:
             {
                 /* this is an infinitely complicated melange of type nonsense */
+                LOADOP(left, RAX);
+                LOADOP(right, RDX);
                 if (leftType == rightType) {
                     /* "easier" case: They're at least the same type */
                     switch (leftType) {
