@@ -71,6 +71,8 @@ SDYN_NODEX(TRUE)        /*  - []                    eval to true    */
 SDYN_NODEX(OBJ)         /*  - []                    eval to new object */
 
 /* nodes for IR only */
+SDYN_NODEX(NOP)             /* do nothing with a value
+                               l:value */
 SDYN_NODEX(UNIFY)           /* unify two values
                                l:value 1
                                r:value 2 */

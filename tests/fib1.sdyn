@@ -1,0 +1,23 @@
+function fib(n) {
+    var a;
+    var b;
+    var c;
+    var i;
+    a = 1;
+    b = 1;
+    i = 2;
+    while (i < n) {
+        c = a + b;
+        a = b;
+        b = c;
+        $print(i);
+        i = i + 1;
+    }
+    return b;
+}
+
+function fib10() {
+    $print(fib(10));
+}
+
+fib10();

@@ -275,7 +275,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             for (i = 0; i < GGC_RD(symbols2, size); i++) {
                 name = GGC_RAP(GGC_RP(symbols2, keys), i);
                 if (name) {
+                    size_t idx;
                     indexBox2 = GGC_RAP(GGC_RP(symbols2, values), i);
+                    idx = GGC_RD(indexBox2, v);
                     if (SDyn_IndexMapGet(symbols, name, &indexBox)) {
                         if (indexBox != indexBox2) {
                             size_t idx;
@@ -299,6 +301,12 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                         SDyn_IndexMapPut(symbols, name, indexBox2);
 
                     }
+
+                    /* NOP it so the while loop keeps it alive */
+                    irn = GGC_NEW(SDyn_IRNode);
+                    GGC_WD(irn, op, SDYN_NODE_NOP);
+                    GGC_WD(irn, left, idx);
+                    SDyn_IRNodeListPush(ir, irn);
                 }
             }
             break;
@@ -519,15 +527,12 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
 
     GGC_PUSH_8(ir, node, unode, callNode, stksUsed, pstksUsed, irUsed, lastUsed);
 
-    /* first off, perform unification */
+    /* first off, default uidxs */
     irUsed = GGC_NEW_DA(char, ir->length);
     for (si = ir->length - 1; si >= 0; si--) {
         li = 0;
         node = GGC_RAP(ir, si);
-        if (!GGC_RD(node, uidx)) {
-            /* not unified, so simple index */
-            GGC_WD(node, uidx, si);
-        }
+        GGC_WD(node, uidx, si);
     }
 
 #define USED(v) do { \
@@ -556,10 +561,13 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
             case SDYN_NODE_UNIFY:
                 /* set the uidx on both unified nodes */
                 idx = GGC_RD(node, uidx);
+                GGC_WD(node, rtype, SDYN_TYPE_BOXED);
                 unode = GGC_RAP(ir, GGC_RD(node, left));
                 GGC_WD(unode, uidx, idx);
+                GGC_WD(unode, rtype, SDYN_TYPE_BOXED);
                 unode = GGC_RAP(ir, GGC_RD(node, right));
                 GGC_WD(unode, uidx, idx);
+                GGC_WD(unode, rtype, SDYN_TYPE_BOXED);
                 break;
 
             case SDYN_NODE_CALL:

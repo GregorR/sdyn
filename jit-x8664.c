@@ -514,7 +514,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                         IMM64P(RAX, sdyn_toNumber);
                         JCALL(RAX);
                         C2(MOV, intLeft, RAX);
-                        break;
                 }
 
                 LOADOP(right, RDX);
@@ -536,7 +535,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                         IMM64P(RAX, sdyn_toNumber);
                         JCALL(RAX);
                         C2(MOV, RDX, RAX);
-                        break;
                 }
                 C2(MOV, RSI, intLeft);
 
@@ -753,6 +751,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_NOP:
             case SDYN_NODE_UNIFY: break;
 
             default:
