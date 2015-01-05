@@ -1,0 +1,22 @@
+function main() {
+    var x;
+    x = {};
+    $print(x.foo == x.bar);
+    $print(41 == 42);
+    $print(42 == 41);
+    $print(42 == 42);
+    $print(42 != 42);
+    $print(41 != 42);
+    $print("Hello" == "world");
+    $print("Hello" == "hello");
+    $print("Hello" == "Hello");
+    $print(("Hello" == "hello") == (41 == 42));
+    $print((41 != 42) == (x.foo != x.bar));
+
+    $print("42" == 42);
+    $print(42 == "42");
+    $print("42 thousand" == 42);
+    $print(42 == "42 billion");
+}
+
+main();

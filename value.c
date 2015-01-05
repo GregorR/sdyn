@@ -676,6 +676,142 @@ SDyn_Undefined sdyn_add(void **pstack, SDyn_Undefined left, SDyn_Undefined right
     return (SDyn_Undefined) rets;
 }
 
+/* and the even-more-complicated equals function */
+int sdyn_equal(void **pstack, SDyn_Undefined left, SDyn_Undefined right)
+{
+    /* Defined in ES5 as follows (reduced to eliminate types/values/conversions not relevant to SDyn):
+     *
+     * If Type(x) is the same as Type(y), then
+     *
+     *     If Type(x) is Undefined, return true.
+     *
+     *     If Type(x) is Number, then
+     *
+     *         If x is the same Number value as y, return true.
+     *
+     *         Return false.
+     *
+     *     If Type(x) is String, then return true if x and y are exactly the
+     *     same sequence of characters (same length and same characters in
+     *     corresponding positions). Otherwise, return false.
+     *
+     *     If Type(x) is Boolean, return true if x and y are both true or both
+     *     false. Otherwise, return false.
+     *
+     *     Return true if x and y refer to the same object. Otherwise, return
+     *     false.
+     *
+     * If Type(x) is Number and Type(y) is String, return the result of the
+     * comparison x == ToNumber(y).
+     *
+     * If Type(x) is String and Type(y) is Number, return the result of the
+     * comparison ToNumber(x) == y.
+     *
+     * If Type(x) is Boolean, return the result of the comparison ToNumber(x) == y.
+     *
+     * If Type(y) is Boolean, return the result of the comparison x == ToNumber(y).
+     *
+     * If Type(x) is either String or Number and Type(y) is Object, return the
+     * result of the comparison x == ToString(y).
+     *
+     * If Type(x) is Object and Type(y) is either String or Number, return the
+     * result of the comparison ToString(x) == y.
+     *
+     * Return false.
+     */
+
+    SDyn_Tag ltag = NULL, rtag = NULL;
+    SDyn_Number lnum = NULL, rnum = NULL;
+    SDyn_String lstr = NULL, rstr = NULL;
+    GGC_char_Array lstra = NULL, rstra = NULL;
+    int ltagv, rtagv;
+
+    PSTACK();
+    GGC_PUSH_10(left, right, ltag, rtag, lnum, rnum, lstr, rstr, lstra, rstra);
+
+    ltag = (SDyn_Tag) GGC_RUP(left);
+    rtag = (SDyn_Tag) GGC_RUP(right);
+    ltagv = GGC_RD(ltag, type);
+    rtagv = GGC_RD(rtag, type);
+    retry:
+
+    /* first check if they're the same type */
+    if (ltagv == rtagv) {
+        /* simplish case */
+        switch (ltagv) {
+            case SDYN_TYPE_BOXED_INT:
+                /* compare values */
+                lnum = (SDyn_Number) left;
+                rnum = (SDyn_Number) right;
+                return (GGC_RD(lnum, value) == GGC_RD(rnum, value));
+
+            case SDYN_TYPE_STRING:
+            {
+                size_t i;
+
+                lstr = (SDyn_String) left;
+                rstr = (SDyn_String) right;
+                lstra = GGC_RP(lstr, value);
+                rstra = GGC_RP(rstr, value);
+
+                /* first off, if they're not the same length, they can't be equal */
+                if (lstra->length != rstra->length) return 0;
+
+                /* look for differences */
+                for (i = 0; i < lstra->length; i++) {
+                    if (GGC_RAD(lstra, i) != GGC_RAD(rstra, i)) return 0;
+                }
+
+                /* identical */
+                return 1;
+            }
+
+            default:
+                /* all other cases can be compared directly */
+                return (left == right);
+        }
+    }
+
+    /* not the same type. Is one of them a boolean? */
+    if (ltagv == SDYN_TYPE_BOXED_BOOL) {
+        left = (SDyn_Undefined) sdyn_boxInt(NULL, sdyn_toNumber(NULL, left));
+        ltagv = SDYN_TYPE_BOXED_INT;
+        goto retry;
+    }
+    if (rtagv == SDYN_TYPE_BOXED_BOOL) {
+        right = (SDyn_Undefined) sdyn_boxInt(NULL, sdyn_toNumber(NULL, right));
+        rtagv = SDYN_TYPE_BOXED_INT;
+        goto retry;
+    }
+
+    /* is one of them an object or function? */
+    if (ltagv == SDYN_TYPE_OBJECT || ltagv == SDYN_TYPE_FUNCTION) {
+        left = (SDyn_Undefined) sdyn_toString(NULL, left);
+        ltagv = SDYN_TYPE_STRING;
+        goto retry;
+    }
+    if (rtagv == SDYN_TYPE_OBJECT || rtagv == SDYN_TYPE_FUNCTION) {
+        right = (SDyn_Undefined) sdyn_toString(NULL, right);
+        rtagv = SDYN_TYPE_STRING;
+        goto retry;
+    }
+
+    /* is it (number,string) or (string,number)? */
+    if (ltagv == SDYN_TYPE_BOXED_INT && rtagv == SDYN_TYPE_STRING) {
+        right = (SDyn_Undefined) sdyn_boxInt(NULL, sdyn_toNumber(NULL, right));
+        rtagv = SDYN_TYPE_BOXED_INT;
+        goto retry;
+    }
+    if (ltagv == SDYN_TYPE_STRING && rtagv == SDYN_TYPE_BOXED_INT) {
+        left = (SDyn_Undefined) sdyn_boxInt(NULL, sdyn_toNumber(NULL, left));
+        ltagv = SDYN_TYPE_BOXED_INT;
+        goto retry;
+    }
+
+    /* must not be equal */
+    return 0;
+}
+
 /* assert that a function is compiled */
 sdyn_native_function_t sdyn_assertCompiled(void **pstack, SDyn_Function func)
 {

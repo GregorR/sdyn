@@ -602,6 +602,79 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             /* Binary: */
 
+            /* (*, *) -> boolean */
+            case SDYN_NODE_EQ:
+            case SDYN_NODE_NE:
+            {
+                LOADOP(left, RSI);
+                LOADOP(right, RDX);
+                if (leftType != rightType) {
+                    /* we can unbox numbers to get compatible types */
+                    if (leftType == SDYN_TYPE_INT && rightType == SDYN_TYPE_BOXED_INT) {
+                        C2(MOV, right, MEM(8, right, 0, RNONE, 8));
+                        rightType = SDYN_TYPE_INT;
+
+                    } else if (leftType == SDYN_TYPE_BOXED_INT && rightType == SDYN_TYPE_INT) {
+                        C2(MOV, left, MEM(8, left, 0, RNONE, 8));
+                        leftType = SDYN_TYPE_INT;
+
+                    } else if (leftType == SDYN_TYPE_BOXED_INT && rightType == SDYN_TYPE_BOXED_INT) {
+                        C2(MOV, left, MEM(8, left, 0, RNONE, 8));
+                        C2(MOV, right, MEM(8, right, 0, RNONE, 8));
+                        leftType = rightType = SDYN_TYPE_INT;
+
+                    }
+                }
+
+                /* we always put our result in RAX, for later moving */
+                if (leftType == rightType) {
+                    /* if the types are the same, we only need to do a
+                     * sophisticated equality comparison if they're both
+                     * strings or if we only know they're both boxed */
+                    if (leftType == SDYN_TYPE_STRING || leftType == SDYN_TYPE_BOXED) {
+                        /* oh well, just use sdyn_equal */
+                        IMM64P(RAX, sdyn_equal);
+                        JCALL(RAX);
+
+                    } else {
+                        size_t eq;
+
+                        /* comparison is direct */
+                        C2(MOV, RAX, IMM(1));
+                        C2(CMP, left, right);
+                        CF(JEF, eq);
+                        C2(MOV, RAX, IMM(0));
+                        L(eq);
+
+                    }
+
+                } else {
+                    /* types aren't the same, so just box and go */
+                    BOX(leftType, RSI, RSI);
+                    C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
+                    BOX(rightType, RDX, RDX); /* FIXME: value could have been lost... */
+                    C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
+                    IMM64P(RAX, sdyn_equal);
+                    JCALL(RAX);
+
+                }
+
+                if (GGC_RD(node, op) == SDYN_NODE_NE) {
+                    /* invert our result */
+                    C2(XOR, RAX, IMM(1));
+                }
+
+                /* possibly box it */
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    C2(MOV, RSI, RAX);
+                    IMM64P(RAX, sdyn_boxBool);
+                    JCALL(RAX);
+                }
+
+                C2(MOV, target, RAX);
+                break;
+            }
+
             /* (number, number) -> boolean */
             case SDYN_NODE_LT:
             case SDYN_NODE_GT:

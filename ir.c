@@ -494,6 +494,8 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         /* binary nodes: */
+        case SDYN_NODE_EQ:
+        case SDYN_NODE_NE:
         case SDYN_NODE_LT:
         case SDYN_NODE_GT:
         case SDYN_NODE_LE:
