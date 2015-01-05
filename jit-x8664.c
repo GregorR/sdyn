@@ -310,6 +310,13 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 C2(MOV, target, RAX);
                 break;
 
+            case SDYN_NODE_ASSIGN:
+                LOADOP(left, RAX);
+                if (targetType >= SDYN_TYPE_FIRST_BOXED)
+                    BOX(leftType, RAX, left);
+                C2(MOV, target, RAX);
+                break;
+
             case SDYN_NODE_MEMBER:
             {
                 SDyn_String *gstring;

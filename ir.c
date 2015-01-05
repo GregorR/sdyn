@@ -190,12 +190,20 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                     /* get the value */
                     val = SUB(1);
 
+                    /* make the node */
+                    IRNNEW();
+                    GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+                    GGC_WD(irn, left, val);
+                    val = GGC_RD(ir, length);
+
                     /* update the symbol table */
                     tok = GGC_RD(cnode, tok);
                     name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
                     indexBox = GGC_NEW(GGC_size_t_Unit);
                     GGC_WD(indexBox, v, val);
                     SDyn_IndexMapPut(symbols, name, indexBox);
+
+                    SDyn_IRNodeListPush(ir, irn);
 
                     break;
                 }
