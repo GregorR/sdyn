@@ -712,10 +712,10 @@ int sdyn_equal(void **pstack, SDyn_Undefined left, SDyn_Undefined right)
      * If Type(y) is Boolean, return the result of the comparison x == ToNumber(y).
      *
      * If Type(x) is either String or Number and Type(y) is Object, return the
-     * result of the comparison x == ToString(y).
+     * result of the comparison ToString(x) == ToString(y).
      *
      * If Type(x) is Object and Type(y) is either String or Number, return the
-     * result of the comparison ToString(x) == y.
+     * result of the comparison ToString(x) == ToString(y).
      *
      * Return false.
      */
@@ -736,7 +736,9 @@ int sdyn_equal(void **pstack, SDyn_Undefined left, SDyn_Undefined right)
     retry:
 
     /* first check if they're the same type */
-    if (ltagv == rtagv) {
+    if (ltagv == rtagv ||
+        (ltagv == SDYN_TYPE_OBJECT && rtagv == SDYN_TYPE_FUNCTION) ||
+        (ltagv == SDYN_TYPE_FUNCTION && rtagv == SDYN_TYPE_OBJECT)) {
         /* simplish case */
         switch (ltagv) {
             case SDYN_TYPE_BOXED_INT:
@@ -785,12 +787,10 @@ int sdyn_equal(void **pstack, SDyn_Undefined left, SDyn_Undefined right)
     }
 
     /* is one of them an object or function? */
-    if (ltagv == SDYN_TYPE_OBJECT || ltagv == SDYN_TYPE_FUNCTION) {
+    if (ltagv == SDYN_TYPE_OBJECT || ltagv == SDYN_TYPE_FUNCTION ||
+        rtagv == SDYN_TYPE_OBJECT || rtagv == SDYN_TYPE_FUNCTION) {
         left = (SDyn_Undefined) sdyn_toString(NULL, left);
         ltagv = SDYN_TYPE_STRING;
-        goto retry;
-    }
-    if (rtagv == SDYN_TYPE_OBJECT || rtagv == SDYN_TYPE_FUNCTION) {
         right = (SDyn_Undefined) sdyn_toString(NULL, right);
         rtagv = SDYN_TYPE_STRING;
         goto retry;

@@ -652,7 +652,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                     /* types aren't the same, so just box and go */
                     BOX(leftType, RSI, RSI);
                     C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
-                    BOX(rightType, RDX, RDX); /* FIXME: value could have been lost... */
+                    LOADOP(right, RDX);
+                    BOX(rightType, RDX, RDX);
                     C2(MOV, RSI, MEM(8, RDI, 0, RNONE, 0));
                     IMM64P(RAX, sdyn_equal);
                     JCALL(RAX);
@@ -860,6 +861,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                     } else {
                         C2(MOV, RAX, left);
                         BOX(leftType, boxedLeft, RAX);
+                        LOADOP(right, RDX);
                     }
                     if (rightType >= SDYN_TYPE_FIRST_BOXED) {
                         C2(MOV, RDX, right);

@@ -1,6 +1,10 @@
 function main() {
     var x;
+    var y;
+    var z;
     x = {};
+    y = x;
+    z = {};
     $print(x.foo == x.bar);
     $print(41 == 42);
     $print(42 == 41);
@@ -17,6 +21,24 @@ function main() {
     $print(42 == "42");
     $print("42 thousand" == 42);
     $print(42 == "42 billion");
+
+    $print(true == "1");
+    $print(true == "0");
+    $print(true == 1);
+    $print(true == 0);
+    $print("1" == false);
+    $print("0" == false);
+    $print(1 == false);
+    $print(0 == false);
+
+    $print(x == "[object Object]");
+    $print("[object Object]" == x);
+    $print(x == y);
+    $print(x == z);
+    $print(z == x);
+    $print(main == x);
+    x = main;
+    $print(x == main);
 }
 
 main();
