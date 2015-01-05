@@ -10,7 +10,6 @@ function fib(n) {
         c = a + b;
         a = b;
         b = c;
-        $print(i);
         i = i + 1;
     }
     return b;
