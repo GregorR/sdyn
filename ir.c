@@ -1,3 +1,23 @@
+/*
+ * SDyn: IR-related functionality, including compiling parse trees into IR, and
+ * doing "register allocation" over IR. Note that this implementation has no
+ * real register allocation; everything goes in memory.
+ *
+ * Copyright (c) 2015 Gregor Richards
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+ * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -10,7 +30,7 @@
 
 GGC_LIST_STATIC(SDyn_IRNode)
 
-/* compile a node to IR */
+/* compile a parse tree node to IR */
 static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap symbols)
 {
     SDyn_NodeArray children = NULL;
@@ -263,7 +283,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                 }
             }
 
-            /* now do the while */
+            /* now do the while condition */
             i = SUB(0); /* NOTE: actually need to unify here to be correct */
             irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_WCOND);
@@ -271,15 +291,17 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             cond = GGC_RD(ir, length);
             SDyn_IRNodeListPush(ir, irn);
 
+            /* the loop body */
             SUB(1);
 
+            /* and the loop end */
             irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_WEND);
             GGC_WD(irn, left, begin);
             GGC_WD(irn, right, cond);
             SDyn_IRNodeListPush(ir, irn);
 
-            /* then unify */
+            /* then unify our pre-loop and post-loop variables */
             for (i = 0; i < GGC_RD(symbols2, size); i++) {
                 name = GGC_RAP(GGC_RP(symbols2, keys), i);
                 if (name) {
@@ -412,7 +434,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
         }
 
-        /* 0-ary */
+        /* 0-ary nodes: */
         case SDYN_NODE_NUM:
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_INT);
@@ -447,7 +469,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SDyn_IRNodeListPush(ir, irn);
             break;
 
-        /* unary */
+        /* unary nodes: */
         case SDYN_NODE_RETURN:
             IRNNEW();
             i = SUB(0);
@@ -455,7 +477,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SDyn_IRNodeListPush(ir, irn);
             break;
 
-        /* binary */
+        /* binary nodes: */
         case SDYN_NODE_LT:
         case SDYN_NODE_GT:
         case SDYN_NODE_LE:
@@ -567,7 +589,7 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
         /* handle special cases */
         switch (GGC_RD(node, op)) {
             case SDYN_NODE_UNIFY:
-                /* set the uidx on both unified nodes */
+                /* set the uidx on both unified nodes, and force them to box in case their types differ */
                 idx = GGC_RD(node, uidx);
                 GGC_WD(node, rtype, SDYN_TYPE_BOXED);
                 unode = GGC_RAP(ir, GGC_RD(node, left));
