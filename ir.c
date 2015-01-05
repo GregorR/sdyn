@@ -518,6 +518,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         case SDYN_NODE_SUB:
+        case SDYN_NODE_MUL:
+        case SDYN_NODE_MOD:
+        case SDYN_NODE_DIV:
             IRNNEW();
             GGC_WD(irn, rtype, SDYN_TYPE_INT);
             i = SUB(0);

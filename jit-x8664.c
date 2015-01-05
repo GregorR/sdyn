@@ -808,9 +808,14 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             /* (number, number) -> number */
             case SDYN_NODE_SUB:
+            case SDYN_NODE_MUL:
+            case SDYN_NODE_MOD:
+            case SDYN_NODE_DIV:
             {
-                struct SJA_X8664_Operand intLeft;
+                struct SJA_X8664_Operand intLeft, result;
                 size_t after;
+
+                /* left -> RAX, right -> RSI */
 
                 /* get both operands as numbers */
                 intLeft = MEM(8, RBP, 0, RNONE, -16);
@@ -837,40 +842,50 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                         break;
                 }
 
-                LOADOP(right, RDX);
+                LOADOP(right, RSI);
                 switch (rightType) {
                     case SDYN_TYPE_BOXED_INT:
-                        C2(MOV, RDX, MEM(8, right, 0, RNONE, 8));
+                        C2(MOV, RSI, MEM(8, right, 0, RNONE, 8));
                         break;
 
                     case SDYN_TYPE_INT:
                         break;
 
                     default:
-                        if (rightType < SDYN_TYPE_FIRST_BOXED) {
+                        if (rightType < SDYN_TYPE_FIRST_BOXED)
                             BOX(rightType, RSI, right);
-                        } else {
-                            C2(MOV, RSI, right);
-                        }
                         IMM64P(RAX, sdyn_toNumber);
                         JCALL(RAX);
-                        C2(MOV, RDX, RAX);
+                        C2(MOV, RSI, RAX);
                         break;
                 }
                 C2(MOV, RAX, intLeft);
 
                 /* do the appropriate operation */
                 switch (GGC_RD(node, op)) {
-                    case SDYN_NODE_SUB: C2(SUB, RAX, RDX); break;
+                    case SDYN_NODE_SUB: C2(SUB, RAX, RSI); result = RAX; break;
+                    case SDYN_NODE_MUL: C2(IMUL, RAX, RSI); result = RAX; break;
+
+                    case SDYN_NODE_MOD:
+                    case SDYN_NODE_DIV:
+                        C2(XOR, RDX, RDX);
+                        C1(IDIV, RSI);
+                        if (GGC_RD(node, op) == SDYN_NODE_MOD)
+                            result = RDX;
+                        else
+                            result = RAX;
+                        break;
                 }
 
                 /* and return */
                 if (targetType >= SDYN_TYPE_FIRST_BOXED) {
-                    C2(MOV, RSI, RAX);
+                    C2(MOV, RSI, result);
                     IMM64P(RAX, sdyn_boxInt);
                     JCALL(RAX);
+                    C2(MOV, target, RAX);
+                } else {
+                    C2(MOV, target, result);
                 }
-                C2(MOV, target, RAX);
 
                 break;
             }

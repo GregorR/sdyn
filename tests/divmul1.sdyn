@@ -1,0 +1,33 @@
+function show(i, op, j, res) {
+    $print(i);
+    $print(op);
+    $print(j);
+    $print("=");
+    $print(res);
+    $print("");
+}
+
+function main() {
+    var i;
+    var j;
+    var r;
+    i = 1;
+    while (i <= 10) {
+        j = 1;
+        while (j <= 10) {
+            r = i * j;
+            show(i, "*", j, r);
+
+            r = ~~(i / j);
+            show(i, "/", j, r);
+
+            r = i % j;
+            show(i, "%", j, r);
+
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+}
+
+main();
