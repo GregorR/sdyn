@@ -1,0 +1,37 @@
+function binsearch(arr, val, from, to) {
+    var s;
+    var av;
+    if (from == to) {
+        return from;
+    }
+    s = from + ~~((to - from) / 2);
+    av = arr[s];
+    if (av > val) {
+        return binsearch(arr, val, from, s);
+    } else {
+        if (av < val) {
+            return binsearch(arr, val, s + 1, to);
+        } else {
+            return s;
+        }
+    }
+}
+
+function main() {
+    var arr;
+    arr = {};
+    arr.length = 10;
+    arr[0] = 5;
+    arr[1] = 7;
+    arr[2] = 42;
+    arr[3] = 45;
+    arr[4] = 60;
+    arr[5] = 123;
+    arr[6] = 1234;
+    arr[7] = 4000;
+    arr[8] = 4222;
+    arr[9] = 10000;
+    $print(binsearch(arr, 64, 0, arr.length));
+}
+
+main();
