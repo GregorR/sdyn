@@ -1,0 +1,14 @@
+function foo(n) {
+    var i;
+    i = 0;
+    while (!(i >= n)) {
+        $print(i);
+        i = i + 1;
+    }
+}
+
+function main() {
+    foo(10);
+}
+
+main();

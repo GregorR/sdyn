@@ -560,6 +560,36 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 returns.bufused++;
                 break;
 
+            /* (boolean) -> boolean */
+            case SDYN_NODE_NOT:
+                LOADOP(left, RSI);
+
+                /* do we need to unbox? */
+                if (leftType == SDYN_TYPE_BOXED_BOOL) {
+                    C2(MOV, RSI, MEM(8, RSI, 0, RNONE, 8));
+                    leftType = SDYN_TYPE_BOOL;
+                }
+
+                /* do we need to coerce? */
+                if (leftType != SDYN_TYPE_BOOL) {
+                    IMM64P(RAX, sdyn_boxBool);
+                    JCALL(RAX);
+                    C2(MOV, RSI, MEM(8, RAX, 0, RNONE, 8));
+                }
+
+                /* invert */
+                C2(XOR, RSI, IMM(1));
+
+                /* and possibly box */
+                if (targetType >= SDYN_TYPE_FIRST_BOXED) {
+                    IMM64P(RAX, sdyn_boxBool);
+                    JCALL(RAX);
+                    C2(MOV, target, RAX);
+                } else {
+                    C2(MOV, target, RSI);
+                }
+                break;
+
             case SDYN_NODE_TYPEOF:
                 LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
