@@ -560,6 +560,16 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 returns.bufused++;
                 break;
 
+            case SDYN_NODE_TYPEOF:
+                LOADOP(left, RAX);
+                BOX(leftType, RSI, left);
+
+                /* just count on sdyn_typeof */
+                IMM64P(RAX, sdyn_typeof);
+                JCALL(RAX);
+                C2(MOV, target, RAX);
+                break;
+
             /* Binary: */
 
             /* (number, number) -> boolean */

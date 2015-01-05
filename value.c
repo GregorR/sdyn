@@ -508,6 +508,42 @@ SDyn_Function sdyn_assertFunction(void **pstack, SDyn_Function func)
     return func;
 }
 
+/* the typeof operation */
+SDyn_String sdyn_typeof(void **pstack, SDyn_Undefined value)
+{
+    SDyn_Tag tag = NULL;
+    GGC_char_Array reta = NULL;
+    SDyn_String ret = NULL;
+
+    PSTACK();
+    GGC_PUSH_4(value, tag, reta, ret);
+
+    tag = (SDyn_Tag) GGC_RUP(value);
+
+    /* macro to load a string into GGC */
+#define LSTR(str) do { \
+    reta = GGC_NEW_DA(char, sizeof(str)-1); \
+    memcpy(reta->a__data, str, sizeof(str)-1); \
+} while(0)
+
+    /* make our string return */
+    switch (GGC_RD(tag, type)) {
+        case SDYN_TYPE_BOXED_UNDEFINED: LSTR("undefined"); break;
+        case SDYN_TYPE_BOXED_BOOL:      LSTR("boolean"); break;
+        case SDYN_TYPE_BOXED_INT:       LSTR("number"); break;
+        case SDYN_TYPE_STRING:          LSTR("string"); break;
+        case SDYN_TYPE_OBJECT:          LSTR("object"); break;
+        case SDYN_TYPE_FUNCTION:        LSTR("function"); break;
+        default:                        LSTR("???"); break;
+    }
+
+    /* and box it */
+    ret = GGC_NEW(SDyn_String);
+    GGC_WP(ret, value, reta);
+
+    return ret;
+}
+
 /* get the index to which a member belongs in this object, creating one if requested */
 size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String member, int create)
 {

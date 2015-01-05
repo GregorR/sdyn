@@ -1,0 +1,25 @@
+function foo() {
+    return true;
+}
+
+function main() {
+    var x;
+    x = main;
+    $print(typeof x);
+    x = {};
+    $print(typeof x);
+    x = 42;
+    $print(typeof x);
+    $print(typeof (x + 2));
+    $print(typeof (x + "2"));
+    x = true;
+    $print(typeof x);
+    x = false;
+    $print(typeof x);
+
+    $print(typeof "hello");
+    $print(typeof foo);
+    $print(typeof(foo()));
+}
+
+main();
