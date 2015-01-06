@@ -3,11 +3,9 @@ function binsearch(arr, val, from, to) {
     var av;
     if (from == to) {
         s = from;
-        /*
         while (s > 0 && arr[s] > val) {
             s = s - 1;
         }
-        */
         return s;
     }
     s = from + ~~((to - from) / 2);

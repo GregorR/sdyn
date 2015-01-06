@@ -529,6 +529,56 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         /* binary nodes: */
+        case SDYN_NODE_OR:
+        case SDYN_NODE_AND:
+        {
+            size_t cond1, cond1n, cond2, ifNode, ifElse;
+
+            /* compile the first condition */
+            cond1 = SUB(0);
+
+            /* we need not-condition because or's the opposite case */
+            if (GGC_RD(node, type) == SDYN_NODE_OR) {
+                irn = GGC_NEW(SDyn_IRNode);
+                GGC_WD(irn, op, SDYN_NODE_NOT);
+                GGC_WD(irn, left, cond1);
+                cond1n = GGC_RD(ir, length);
+                SDyn_IRNodeListPush(ir, irn);
+            } else {
+                cond1n = cond1;
+            }
+
+            /* compile it as an if */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_IF);
+            GGC_WD(irn, left, cond1n);
+            ifNode = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+
+            /* get the second condition */
+            cond2 = SUB(1);
+
+            /* end the if */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_IFELSE);
+            GGC_WD(irn, left, ifNode);
+            ifElse = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_IFEND);
+            GGC_WD(irn, left, ifElse);
+            SDyn_IRNodeListPush(ir, irn);
+
+            /* then unify */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_UNIFY);
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            GGC_WD(irn, left, cond1);
+            GGC_WD(irn, right, cond2);
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+        }
+
         case SDYN_NODE_EQ:
         case SDYN_NODE_NE:
         case SDYN_NODE_LT:

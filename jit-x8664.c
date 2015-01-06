@@ -260,6 +260,18 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 /* if the condition is false, we will jump to the else clause */
                 size_t ifelse;
                 LOADOP(left, RAX);
+
+                /* we may need to coerce it */
+                if (leftType == SDYN_TYPE_BOXED_BOOL) {
+                    C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 8));
+                    leftType = SDYN_TYPE_BOOL;
+                }
+                if (leftType != SDYN_TYPE_BOOL) {
+                    BOX(leftType, RSI, RAX);
+                    IMM64P(RAX, sdyn_toBoolean);
+                    JCALL(RAX);
+                }
+
                 C2(CMP, RAX, IMM(0));
                 CF(JEF, ifelse);
                 GGC_WD(node, imm, ifelse);
@@ -319,7 +331,6 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 if (leftType >= SDYN_TYPE_FIRST_BOXED) {
                     /* boolify it */
                     C2(MOV, RSI, RAX);
-                    fprintf(stderr, "wut\n");
                     IMM64P(RAX, sdyn_toBoolean);
                     JCALL(RAX);
                 }
@@ -609,9 +620,9 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 /* do we need to coerce? */
                 if (leftType != SDYN_TYPE_BOOL) {
-                    IMM64P(RAX, sdyn_boxBool);
+                    IMM64P(RAX, sdyn_toBoolean);
                     JCALL(RAX);
-                    C2(MOV, RSI, MEM(8, RAX, 0, RNONE, 8));
+                    C2(MOV, RSI, RAX);
                 }
 
                 /* invert */
