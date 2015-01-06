@@ -28,10 +28,6 @@
 
 int main(int argc, char **argv)
 {
-    SDyn_Node pnode = NULL, cnode = NULL;
-    SDyn_NodeArray children = NULL;
-    SDyn_String name = NULL;
-    SDyn_Function func = NULL;
     size_t i;
     struct Buffer_char buf;
     FILE *f;
@@ -40,8 +36,6 @@ int main(int argc, char **argv)
     ARG_VARS;
 
     sdyn_initValues();
-
-    GGC_PUSH_5(pnode, cnode, children, name, func);
 
     ARG_NEXT();
     while (argType) {
@@ -60,32 +54,7 @@ int main(int argc, char **argv)
             WRITE_ONE_BUFFER(buf, 0);
             cur = (const unsigned char *) buf.buf;
 
-            /* parse it */
-            pnode = sdyn_parse(cur);
-            children = GGC_RP(pnode, children);
-
-            /* load everything in */
-            for (i = 0; i < children->length; i++) {
-                cnode = GGC_RAP(children, i);
-                name = sdyn_boxString(NULL, (char *) GGC_RD(cnode, tok).val, GGC_RD(cnode, tok).valLen);
-
-                if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
-                    /* add function to global object */
-                    func = sdyn_boxFunction(cnode);
-                    sdyn_setObjectMember(NULL, sdyn_globalObject, name, (SDyn_Undefined) func);
-
-                } else if (GGC_RD(cnode, type) == SDYN_NODE_VARDECL) {
-                    /* add variable to global object */
-                    sdyn_getObjectMemberIndex(NULL, sdyn_globalObject, name, 1);
-
-                } else if (GGC_RD(cnode, type) == SDYN_NODE_GLOBALCALL) {
-                    /* call a global function */
-                    func = (SDyn_Function) sdyn_getObjectMember(NULL, sdyn_globalObject, name);
-                    sdyn_assertFunction(NULL, func);
-                    sdyn_call(NULL, func, 0, NULL);
-
-                }
-            }
+            sdyn_exec(cur);
 
         } else {
             fprintf(stderr, "Use: sdyn <SDyn files>\n");

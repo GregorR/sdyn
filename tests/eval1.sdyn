@@ -1,0 +1,11 @@
+function second() {
+    $print(3);
+}
+
+function main() {
+    $print(1);
+    $eval("function replace() { $print(2); main = second; } replace();");
+}
+
+main();
+main();

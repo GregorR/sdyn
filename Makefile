@@ -5,6 +5,7 @@ LLIBS=ggggc/libggggc.a smalljitasm/libsmalljitasm.a
 LIBS=$(LLIBS) -pthread
 
 OBJS=\
+    exec.o \
     tokenizer.o \
     parser.o \
     ir.o \
@@ -19,9 +20,9 @@ EXTRAS=\
     test-jit
 
 TESTS=\
-	binsearch1 bool1 cmp1 cmp2 cmp3 cmp4 divmul1 eq1 fib1 fib2 loop1 loop2 \
-	loop3 obj1 obj2 obj3 obj4 simple1 simple2 simple3 simple4 sum1 sum2 \
-	sum3 this1 typeof1
+	binsearch1 bool1 cmp1 cmp2 cmp3 cmp4 divmul1 eval1 eq1 fib1 fib2 \
+	global1 loop1 loop2 loop3 obj1 obj2 obj3 obj4 simple1 simple2 simple3 \
+	simple4 sum1 sum2 sum3 this1 typeof1
 
 all: sdyn
 

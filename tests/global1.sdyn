@@ -1,0 +1,14 @@
+var x;
+
+function setup() {
+    x = 1;
+}
+
+function main() {
+    $print(x);
+    x = 2;
+}
+
+setup();
+main();
+main();

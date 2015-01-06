@@ -305,20 +305,43 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                     /* get the value */
                     val = SUB(1);
 
-                    /* make the node */
-                    IRNNEW();
-                    GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
-                    GGC_WD(irn, left, val);
-                    val = GGC_RD(ir, length);
-
-                    /* update the symbol table */
+                    /* the variable being accessed */
                     tok = GGC_RD(cnode, tok);
                     name = sdyn_boxString(NULL, (char *) tok.val, tok.valLen);
-                    indexBox = GGC_NEW(GGC_size_t_Unit);
-                    GGC_WD(indexBox, v, val);
-                    SDyn_IndexMapPut(symbols, name, indexBox);
 
-                    SDyn_IRNodeListPush(ir, irn);
+                    /* check if it's in the symbol table */
+                    if (SDyn_IndexMapGet(symbols, name, &indexBox)) {
+                        /* local variable reference */
+                        IRNNEW();
+                        GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+                        GGC_WD(irn, left, val);
+                        val = GGC_RD(ir, length);
+                        SDyn_IRNodeListPush(ir, irn);
+
+                        /* update the symbol table */
+                        indexBox = GGC_NEW(GGC_size_t_Unit);
+                        GGC_WD(indexBox, v, val);
+                        SDyn_IndexMapPut(symbols, name, indexBox);
+
+                    } else {
+                        /* global variable reference, perform as assignment on global object */
+                        size_t g;
+
+                        /* get the global object */
+                        irn = GGC_NEW(SDyn_IRNode);
+                        GGC_WD(irn, op, SDYN_NODE_TOP);
+                        GGC_WD(irn, rtype, SDYN_TYPE_OBJECT);
+                        g = GGC_RD(ir, length);
+                        SDyn_IRNodeListPush(ir, irn);
+
+                        /* and perform the assignment */
+                        irn = GGC_NEW(SDyn_IRNode);
+                        GGC_WD(irn, op, SDYN_NODE_ASSIGNMEMBER);
+                        GGC_WD(irn, left, g);
+                        GGC_WD(irn, right, val);
+                        GGC_WP(irn, immp, name);
+                        SDyn_IRNodeListPush(ir, irn);
+                    }
 
                     break;
                 }

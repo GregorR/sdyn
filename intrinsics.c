@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "sdyn/exec.h"
 #include "sdyn/intrinsics.h"
 
 /* get an intrinsic by name. All intrinsics are simply hardwired */
@@ -34,12 +35,45 @@ sdyn_native_function_t sdyn_getIntrinsic(SDyn_String intrinsic)
 
 #define TOK(str) if (!strncmp(schar->a__data, "$" #str, schar->length))
 
-    TOK(print) {
+    TOK(eval) {
+        return sdyn_iEval;
+    } else TOK(print) {
         return sdyn_iPrint;
     }
 
     fprintf(stderr, "Invalid native function %.*s!\n", (int) schar->length, schar->a__data);
     abort();
+}
+
+/* global eval */
+SDyn_Undefined sdyn_iEval(void **pstack, size_t argCt, SDyn_Undefined *args)
+{
+    SDyn_String codeStr = NULL;
+    GGC_char_Array codeA = NULL;
+    unsigned char *code;
+
+    if (pstack) ggc_jitPointerStack = pstack;
+
+    GGC_PUSH_2(codeStr, codeA);
+
+    /* get our code */
+    if (argCt >= 1) codeStr = sdyn_toString(NULL, args[0]);
+    else codeStr = sdyn_boxString(NULL, "", 0);
+
+    /* get it out of the GC */
+    codeA = GGC_RP(codeStr, value);
+    code = malloc(codeA->length + 1);
+    if (!code) {
+        perror("malloc");
+        exit(1);
+    }
+    memcpy(code, codeA->a__data, codeA->length);
+    code[codeA->length] = 0;
+
+    /* and execute */
+    sdyn_exec(code);
+
+    return sdyn_undefined;
 }
 
 /* print a value of any type, by coercing it to a string */
