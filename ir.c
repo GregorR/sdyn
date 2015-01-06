@@ -18,6 +18,30 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+/*
+ * SDyn's IR is in SSA form. SSA instructions are "Static Single Assignment":
+ * i.e., each SSA instruction produces a value, and in general that value may
+ * never be changed. It is up to register allocation to determine how much
+ * space those values must occupy, and when memory locations may be reused.
+ *
+ * IR instructions refer to each other in terms of indexes within an array.
+ * Each IR instruction has as many as three such indexes, labeled 'left',
+ * 'right' and 'third'. Their meanings are documented in h/sdyn/nodex.h .
+ *
+ * IR instructions additionally have a type, which refers to the type of value
+ * which will be generated at runtime. This type must be semantically correct;
+ * i.e., the JIT is free to assume that the IR will never be written to insist
+ * that a number be typed as a string, or that object members will be unboxed,
+ * etc. The most important use for this type is to enforce that values are
+ * boxed by the JIT.
+ *
+ * To support variables which may change differently in different branches,
+ * like any SSA, SDyn's IR uses unification (also known as the Phi function).
+ * The UNIFY operation indicates that two values are to be assigned to the same
+ * location by the register allocator, effectively making them a single
+ * variable.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
