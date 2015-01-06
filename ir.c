@@ -30,6 +30,83 @@
 
 GGC_LIST_STATIC(SDyn_IRNode)
 
+/* utility function to clone a symbol table */
+static SDyn_IndexMap cloneSymbolTable(SDyn_IndexMap symbols)
+{
+    SDyn_IndexMap symbols2 = NULL;
+    SDyn_String name = NULL;
+    GGC_size_t_Unit indexBox = NULL;
+    size_t i;
+
+    GGC_PUSH_4(symbols, symbols2, name, indexBox);
+
+    /* we'll need to compare our symbol table before and after to unify, so first, copy */
+    symbols2 = GGC_NEW(SDyn_IndexMap);
+    for (i = 0; i < GGC_RD(symbols, size); i++) {
+        name = GGC_RAP(GGC_RP(symbols, keys), i);
+        if (name) {
+            indexBox = GGC_RAP(GGC_RP(symbols, values), i);
+            SDyn_IndexMapPut(symbols2, name, indexBox);
+        }
+    }
+
+    return symbols2;
+}
+
+/* utility function to unify symbol tables */
+static void unifySymbolTables(SDyn_IRNodeList ir, SDyn_IndexMap symbols, SDyn_IndexMap symbols2, int loop)
+{
+    SDyn_IRNode irn = NULL;
+    SDyn_String name = NULL;
+    GGC_size_t_Unit indexBox = NULL, indexBox2 = NULL;
+    size_t i;
+
+    GGC_PUSH_7(ir, symbols, symbols2, irn, name, indexBox, indexBox2);
+
+    /* go through each symbol */
+    for (i = 0; i < GGC_RD(symbols2, size); i++) {
+        name = GGC_RAP(GGC_RP(symbols2, keys), i);
+        if (name) {
+            size_t idx;
+            indexBox2 = GGC_RAP(GGC_RP(symbols2, values), i);
+            idx = GGC_RD(indexBox2, v);
+            if (SDyn_IndexMapGet(symbols, name, &indexBox)) {
+                if (indexBox != indexBox2) {
+                    size_t idx;
+
+                    /* they both have different indexes, must unify */
+                    irn = GGC_NEW(SDyn_IRNode);
+                    GGC_WD(irn, op, SDYN_NODE_UNIFY);
+                    GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+                    idx = GGC_RD(indexBox, v);
+                    GGC_WD(irn, left, idx);
+                    idx = GGC_RD(indexBox2, v);
+                    GGC_WD(irn, right, idx);
+                    indexBox = GGC_NEW(GGC_size_t_Unit);
+                    idx = GGC_RD(ir, length);
+                    GGC_WD(indexBox, v, idx);
+                    SDyn_IRNodeListPush(ir, irn);
+                }
+
+            } else {
+                /* added in symbols2, just need to copy it */
+                SDyn_IndexMapPut(symbols, name, indexBox2);
+
+            }
+
+            /* NOP it so it stays alive for loops */
+            if (loop) {
+                irn = GGC_NEW(SDyn_IRNode);
+                GGC_WD(irn, op, SDYN_NODE_NOP);
+                GGC_WD(irn, left, idx);
+                SDyn_IRNodeListPush(ir, irn);
+            }
+        }
+    }
+
+    return;
+}
+
 /* compile a parse tree node to IR */
 static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap symbols)
 {
@@ -266,10 +343,14 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_IF:
         {
+            SDyn_IndexMap symbolsSwap;
             size_t nodeIf, nodeElse;
 
             /* check the condition */
             i = SUB(0);
+
+            /* we'll need to unify both sides of the if */
+            symbols2 = cloneSymbolTable(symbols);
 
             /* conditionally jump to else */
             IRNNEW();
@@ -287,6 +368,11 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             nodeElse = GGC_RD(ir, length);
             SDyn_IRNodeListPush(ir, irn);
 
+            /* swap our symbol tables */
+            symbolsSwap = symbols;
+            symbols = symbols2;
+            symbols2 = symbolsSwap;
+
             /* do the else body */
             if (GGC_RAP(children, 2))
                 SUB(2);
@@ -296,6 +382,10 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             GGC_WD(irn, op, SDYN_NODE_IFEND);
             GGC_WD(irn, left, nodeElse);
             SDyn_IRNodeListPush(ir, irn);
+
+            /* and unify */
+            unifySymbolTables(ir, symbols, symbols2, 0);
+
             break;
         }
 
@@ -309,14 +399,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SDyn_IRNodeListPush(ir, irn);
 
             /* we'll need to compare our symbol table before and after to unify, so first, copy */
-            symbols2 = GGC_NEW(SDyn_IndexMap);
-            for (i = 0; i < GGC_RD(symbols, size); i++) {
-                name = GGC_RAP(GGC_RP(symbols, keys), i);
-                if (name) {
-                    indexBox = GGC_RAP(GGC_RP(symbols, values), i);
-                    SDyn_IndexMapPut(symbols2, name, indexBox);
-                }
-            }
+            symbols2 = cloneSymbolTable(symbols);
 
             /* now do the while condition */
             i = SUB(0); /* NOTE: actually need to unify here to be correct */
@@ -337,43 +420,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             SDyn_IRNodeListPush(ir, irn);
 
             /* then unify our pre-loop and post-loop variables */
-            for (i = 0; i < GGC_RD(symbols2, size); i++) {
-                name = GGC_RAP(GGC_RP(symbols2, keys), i);
-                if (name) {
-                    size_t idx;
-                    indexBox2 = GGC_RAP(GGC_RP(symbols2, values), i);
-                    idx = GGC_RD(indexBox2, v);
-                    if (SDyn_IndexMapGet(symbols, name, &indexBox)) {
-                        if (indexBox != indexBox2) {
-                            size_t idx;
-
-                            /* they both have different indexes, must unify */
-                            irn = GGC_NEW(SDyn_IRNode);
-                            GGC_WD(irn, op, SDYN_NODE_UNIFY);
-                            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
-                            idx = GGC_RD(indexBox, v);
-                            GGC_WD(irn, left, idx);
-                            idx = GGC_RD(indexBox2, v);
-                            GGC_WD(irn, right, idx);
-                            indexBox = GGC_NEW(GGC_size_t_Unit);
-                            idx = GGC_RD(ir, length);
-                            GGC_WD(indexBox, v, idx);
-                            SDyn_IRNodeListPush(ir, irn);
-                        }
-
-                    } else {
-                        /* added in symbols2, just need to copy it */
-                        SDyn_IndexMapPut(symbols, name, indexBox2);
-
-                    }
-
-                    /* NOP it so the while loop keeps it alive */
-                    irn = GGC_NEW(SDyn_IRNode);
-                    GGC_WD(irn, op, SDYN_NODE_NOP);
-                    GGC_WD(irn, left, idx);
-                    SDyn_IRNodeListPush(ir, irn);
-                }
-            }
+            unifySymbolTables(ir, symbols, symbols2, 1);
             break;
         }
 
@@ -555,6 +602,9 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             ifNode = GGC_RD(ir, length);
             SDyn_IRNodeListPush(ir, irn);
 
+            /* the second condition is optional, so need to unify */
+            symbols2 = cloneSymbolTable(symbols);
+
             /* get the second condition */
             cond2 = SUB(1);
 
@@ -576,6 +626,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             GGC_WD(irn, left, cond1);
             GGC_WD(irn, right, cond2);
             SDyn_IRNodeListPush(ir, irn);
+            unifySymbolTables(ir, symbols, symbols2, 0);
             break;
         }
 
