@@ -44,7 +44,9 @@ global scope.
 Each function has a local scope. The variables in this scope are those declared
 in the VarDecls of the function, as well as the parameters. The parameters are
 initialized to the corresponding arguments passed while calling the function.
-If fewer arguments were passed then are required, the remaining parameters are
+Every function has an implicit first parameter "this", and every function call
+supplies "this" based on the target of the call, rather than the arguments.  If
+fewer arguments were passed then are required, the remaining parameters are
 initialized to 'undefined'. All other local variables are also initialized to
 'undefined'.
 

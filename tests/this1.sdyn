@@ -1,0 +1,25 @@
+function sum() {
+    if (this.next) {
+        return this.val + this.next.sum();
+    } else {
+        return this.val;
+    }
+}
+
+function List(val, next) {
+    var ret;
+    ret = {};
+    ret.val = val;
+    ret.next = next;
+    ret.sum = sum;
+    return ret;
+}
+
+function main() {
+    var l;
+    var u;
+    l = List(2, List(12, List(42, u)));
+    $print(l.sum());
+}
+
+main();

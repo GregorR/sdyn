@@ -108,23 +108,24 @@ static void unifySymbolTables(SDyn_IRNodeList ir, SDyn_IndexMap symbols, SDyn_In
 }
 
 /* compile a parse tree node to IR */
-static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap symbols)
+static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap symbols, size_t *target)
 {
     SDyn_NodeArray children = NULL;
     SDyn_Node cnode = NULL;
     SDyn_IRNode irn = NULL;
     SDyn_String name = NULL;
     GGC_size_t_Unit indexBox = NULL, indexBox2 = NULL;
+    GGC_size_t_Array args = NULL;
     SDyn_IndexMap symbols2 = NULL;
 
     struct SDyn_Token tok;
     size_t i;
 
-    GGC_PUSH_10(ir, node, symbols, children, cnode, irn, name, indexBox, indexBox2, symbols2);
+    GGC_PUSH_11(ir, node, symbols, children, cnode, irn, name, indexBox, indexBox2, args, symbols2);
 
     children = GGC_RP(node, children);
 
-#define SUB(x) irCompileNode(ir, GGC_RAP(children, x), symbols)
+#define SUB(x) irCompileNode(ir, GGC_RAP(children, x), symbols, NULL)
 #define IRNNEW() do { \
     int irntype; \
     irn = GGC_NEW(SDyn_IRNode); \
@@ -182,9 +183,25 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
 
         case SDYN_NODE_PARAMS:
-            /* simple list */
+            /* first the "this" parameter */
+            name = sdyn_boxString(NULL, "this", 4);
+
+            /* add it to the symbol table */
+            indexBox = GGC_NEW(GGC_size_t_Unit);
+            i = GGC_RD(ir, length);
+            GGC_WD(indexBox, v, i);
+            SDyn_IndexMapPut(symbols, name, indexBox);
+
+            /* make the IR node */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_PARAM);
+            GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+            GGC_WD(irn, imm, 0);
+            SDyn_IRNodeListPush(ir, irn);
+
+            /* now the normal parameters */
             for (i = 0; i < children->length; i++) {
-                size_t paramIdx;
+                size_t paramIdx, paramNum;
 
                 cnode = GGC_RAP(children, i);
 
@@ -201,7 +218,8 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
                 irn = GGC_NEW(SDyn_IRNode);
                 GGC_WD(irn, op, SDYN_NODE_PARAM);
                 GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
-                GGC_WD(irn, imm, i);
+                paramNum = i + 1;
+                GGC_WD(irn, imm, paramNum);
 
                 /* add it to the list */
                 SDyn_IRNodeListPush(ir, irn);
@@ -430,6 +448,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
             /* get the object */
             i = SUB(0);
+            if (target) *target = i;
             GGC_WD(irn, left, i);
 
             /* the name is the token */
@@ -447,6 +466,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
             /* get the object */
             i = SUB(0);
+            if (target) *target = i;
             GGC_WD(irn, left, i);
 
             /* and the index */
@@ -458,23 +478,46 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_CALL:
         {
-            size_t f;
+            size_t f, target;
 
-            /* get the function to call */
-            f = SUB(0);
+            /* get the target and function to call */
+            target = 0;
+            cnode = GGC_RAP(children, 0);
+            f = irCompileNode(ir, cnode, symbols, &target);
 
-            /* get all the arguments */
+            /* make room for argument values */
             cnode = GGC_RAP(children, 1);
             children = GGC_RP(cnode, children);
-            for (i = 0; i < children->length; i++) {
-                size_t v;
+            args = GGC_NEW_DA(size_t, children->length + 1);
 
-                /* put in an arg slot */
+            /* set the target argument */
+            if (!target) {
+                irn = GGC_NEW(SDyn_IRNode);
+                GGC_WD(irn, op, SDYN_NODE_NIL);
+                GGC_WD(irn, rtype, SDYN_TYPE_BOXED);
+                target = GGC_RD(ir, length);
+                SDyn_IRNodeListPush(ir, irn);
+            }
+            GGC_WAD(args, 0, target);
+
+            /* evaluate all the arguments */
+            for (i = 0; i < children->length; i++) {
+                size_t v, anum;
+
+                v = SUB(i);
+                anum = i + 1;
+                GGC_WAD(args, anum, v);
+
+            }
+
+            /* put them in argument slots */
+            for (i = 0; i < args->length; i++) {
+                size_t v;
                 irn = GGC_NEW(SDyn_IRNode);
                 GGC_WD(irn, op, SDYN_NODE_ARG);
-                GGC_WD(irn, imm, i);
-                v = SUB(i);
+                v = GGC_RAD(args, i);
                 GGC_WD(irn, left, v);
+                GGC_WD(irn, imm, i);
                 SDyn_IRNodeListPush(ir, irn);
             }
 
@@ -489,18 +532,28 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
 
         case SDYN_NODE_INTRINSICCALL:
         {
-            /* get all the arguments */
+            /* make room for arguments */
             cnode = GGC_RAP(children, 0);
             children = GGC_RP(cnode, children);
+            args = GGC_NEW_DA(size_t, children->length);
+
+            /* evaluate them */
             for (i = 0; i < children->length; i++) {
                 size_t v;
 
-                /* put in an arg slot */
+                v = SUB(i);
+                GGC_WAD(args, i, v);
+            }
+
+            /* put them in arg slots */
+            for (i = 0; i < args->length; i++) {
+                size_t v;
+
                 irn = GGC_NEW(SDyn_IRNode);
                 GGC_WD(irn, op, SDYN_NODE_ARG);
-                GGC_WD(irn, imm, i);
-                v = SUB(i);
+                v = GGC_RAD(args, i);
                 GGC_WD(irn, left, v);
+                GGC_WD(irn, imm, i);
                 SDyn_IRNodeListPush(ir, irn);
             }
 
@@ -693,7 +746,7 @@ SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func)
     /* compile it */
     ir = GGC_NEW(SDyn_IRNodeList);
     symbols = GGC_NEW(SDyn_IndexMap);
-    irCompileNode(ir, func, symbols);
+    irCompileNode(ir, func, symbols, NULL);
 
     /* convert to array */
     ret = SDyn_IRNodeListToArray(ir);

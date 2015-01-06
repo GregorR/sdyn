@@ -594,7 +594,8 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 /* arguments must be boxed */
                 LOADOP(left, RAX);
-                BOX(leftType, target, left);
+                BOX(leftType, RAX, left);
+                C2(MOV, target, RAX);
                 break;
 
             case SDYN_NODE_RETURN:
