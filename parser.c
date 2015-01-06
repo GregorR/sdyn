@@ -309,6 +309,7 @@ PARSER(Statement)
         ASSERTNEXT(LBRACE);
         ret = parseStatements(ntok);
         GGC_WAP(children, 1, ret);
+        ASSERTNEXT(RBRACE);
         ret = parseElseClause(ntok);
         GGC_WAP(children, 2, ret);
         RET(IF, rep, children);

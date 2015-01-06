@@ -96,6 +96,11 @@ SDYN_NODEX(UNIFY)           /* unify two values
                                l:value 1
                                r:value 2 */
 
+/* with if loops, IF is the start, IFELSE is the else part, and IFEND ends
+ * that. If no else clause, IFELSE is immediately followed by IFEND */
+SDYN_NODEX(IFELSE)
+SDYN_NODEX(IFEND)
+
 /* with while loops, WHILE is the start, WCOND is the condition, and WEND is the end */
 SDYN_NODEX(WCOND)
 SDYN_NODEX(WEND)

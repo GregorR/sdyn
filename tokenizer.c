@@ -46,6 +46,7 @@ struct SDyn_Token sdyn_tokenize(const unsigned char *inp)
                 /* block comment */
                 inp += 2;
                 while (*inp && (inp[0] != '*' || inp[1] != '/')) inp++;
+                if (*inp) inp += 2;
             } else break;
         } else break;
     }

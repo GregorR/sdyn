@@ -264,6 +264,41 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             break;
         }
 
+        case SDYN_NODE_IF:
+        {
+            size_t nodeIf, nodeElse;
+
+            /* check the condition */
+            i = SUB(0);
+
+            /* conditionally jump to else */
+            IRNNEW();
+            GGC_WD(irn, left, i);
+            nodeIf = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+
+            /* do the if body */
+            SUB(1);
+
+            /* begin the else */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_IFELSE);
+            GGC_WD(irn, left, nodeIf);
+            nodeElse = GGC_RD(ir, length);
+            SDyn_IRNodeListPush(ir, irn);
+
+            /* do the else body */
+            if (GGC_RAP(children, 2))
+                SUB(2);
+
+            /* then the end */
+            irn = GGC_NEW(SDyn_IRNode);
+            GGC_WD(irn, op, SDYN_NODE_IFEND);
+            GGC_WD(irn, left, nodeElse);
+            SDyn_IRNodeListPush(ir, irn);
+            break;
+        }
+
         case SDYN_NODE_WHILE:
         {
             size_t begin, cond;

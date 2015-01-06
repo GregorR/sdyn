@@ -2,7 +2,13 @@ function binsearch(arr, val, from, to) {
     var s;
     var av;
     if (from == to) {
-        return from;
+        s = from;
+        /*
+        while (s > 0 && arr[s] > val) {
+            s = s - 1;
+        }
+        */
+        return s;
     }
     s = from + ~~((to - from) / 2);
     av = arr[s];

@@ -255,6 +255,43 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 break;
             }
 
+            case SDYN_NODE_IF:
+            {
+                /* if the condition is false, we will jump to the else clause */
+                size_t ifelse;
+                LOADOP(left, RAX);
+                C2(CMP, RAX, IMM(0));
+                CF(JEF, ifelse);
+                GGC_WD(node, imm, ifelse);
+                break;
+            }
+
+            case SDYN_NODE_IFELSE:
+            {
+                /* first off, jump out of the if */
+                size_t ifelse, ifend;
+                CF(JMPF, ifend);
+                GGC_WD(node, imm, ifend);
+
+                /* now make the jump in for the else */
+                ifelse = GGC_RD(node, left);
+                onode = GGC_RAP(ir, ifelse);
+                ifelse = GGC_RD(onode, imm);
+                L(ifelse);
+                break;
+            }
+
+            case SDYN_NODE_IFEND:
+            {
+                /* make the jump out of the if */
+                size_t ifend;
+                ifend = GGC_RD(node, left);
+                onode = GGC_RAP(ir, ifend);
+                ifend = GGC_RD(onode, imm);
+                L(ifend);
+                break;
+            }
+
             case SDYN_NODE_WHILE:
             {
                 /* we need to keep track of the program counter at the start of
