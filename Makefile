@@ -42,7 +42,7 @@ smalljitasm/libsmalljitasm.a:
 test: sdyn
 	mkdir -p tests/results
 	for i in $(TESTS) ; do \
-	    ./sdyn < tests/$$i.sdyn > tests/results/$$i || break; \
+	    ./sdyn tests/$$i.sdyn > tests/results/$$i || break; \
 	    diff -u tests/results/$$i tests/correct/$$i || break; \
 	done
 

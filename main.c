@@ -20,11 +20,13 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#include "arg.h"
+
 #include "sja/buffer.h"
 
 #include "sdyn/jit.h"
 
-int main()
+int main(int argc, char **argv)
 {
     SDyn_Node pnode = NULL, cnode = NULL;
     SDyn_NodeArray children = NULL;
@@ -32,39 +34,71 @@ int main()
     SDyn_Function func = NULL;
     size_t i;
     struct Buffer_char buf;
+    FILE *f;
     const unsigned char *cur;
-
-    INIT_BUFFER(buf);
-    READ_FILE_BUFFER(buf, stdin);
-    WRITE_ONE_BUFFER(buf, 0);
-    cur = (unsigned char *) buf.buf;
+    int hadFile = 0;
+    ARG_VARS;
 
     sdyn_initValues();
 
     GGC_PUSH_5(pnode, cnode, children, name, func);
 
-    pnode = sdyn_parse(cur);
-    children = GGC_RP(pnode, children);
-    for (i = 0; i < children->length; i++) {
-        cnode = GGC_RAP(children, i);
-        name = sdyn_boxString(NULL, (char *) GGC_RD(cnode, tok).val, GGC_RD(cnode, tok).valLen);
+    ARG_NEXT();
+    while (argType) {
+        if (argType == ARG_VAL) {
+            hadFile = 1;
 
-        if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
-            /* add function to global object */
-            func = sdyn_boxFunction(cnode);
-            sdyn_setObjectMember(NULL, sdyn_globalObject, name, (SDyn_Undefined) func);
+            /* read in this file */
+            INIT_BUFFER(buf);
+            f = fopen(arg, "r");
+            if (!f) {
+                perror(arg);
+                return 1;
+            }
+            READ_FILE_BUFFER(buf, f);
+            fclose(f);
+            WRITE_ONE_BUFFER(buf, 0);
+            cur = (const unsigned char *) buf.buf;
 
-        } else if (GGC_RD(cnode, type) == SDYN_NODE_VARDECL) {
-            /* add variable to global object */
-            sdyn_getObjectMemberIndex(NULL, sdyn_globalObject, name, 1);
+            /* parse it */
+            pnode = sdyn_parse(cur);
+            children = GGC_RP(pnode, children);
 
-        } else if (GGC_RD(cnode, type) == SDYN_NODE_GLOBALCALL) {
-            /* call a global function */
-            func = (SDyn_Function) sdyn_getObjectMember(NULL, sdyn_globalObject, name);
-            sdyn_assertFunction(NULL, func);
-            sdyn_call(NULL, func, 0, NULL);
+            /* load everything in */
+            for (i = 0; i < children->length; i++) {
+                cnode = GGC_RAP(children, i);
+                name = sdyn_boxString(NULL, (char *) GGC_RD(cnode, tok).val, GGC_RD(cnode, tok).valLen);
+
+                if (GGC_RD(cnode, type) == SDYN_NODE_FUNDECL) {
+                    /* add function to global object */
+                    func = sdyn_boxFunction(cnode);
+                    sdyn_setObjectMember(NULL, sdyn_globalObject, name, (SDyn_Undefined) func);
+
+                } else if (GGC_RD(cnode, type) == SDYN_NODE_VARDECL) {
+                    /* add variable to global object */
+                    sdyn_getObjectMemberIndex(NULL, sdyn_globalObject, name, 1);
+
+                } else if (GGC_RD(cnode, type) == SDYN_NODE_GLOBALCALL) {
+                    /* call a global function */
+                    func = (SDyn_Function) sdyn_getObjectMember(NULL, sdyn_globalObject, name);
+                    sdyn_assertFunction(NULL, func);
+                    sdyn_call(NULL, func, 0, NULL);
+
+                }
+            }
+
+        } else {
+            fprintf(stderr, "Use: sdyn <SDyn files>\n");
+            return 1;
 
         }
+
+        ARG_NEXT();
+    }
+
+    if (!hadFile) {
+        fprintf(stderr, "Use: sdyn <SDyn files>\n");
+        return 1;
     }
 
     return 0;
