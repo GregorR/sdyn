@@ -190,10 +190,11 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             /* return undefined */
             irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_NIL);
+            GGC_WD(irn, rtype, SDYN_TYPE_UNDEFINED);
+            i = GGC_RD(ir, length);
             SDyn_IRNodeListPush(ir, irn);
             irn = GGC_NEW(SDyn_IRNode);
             GGC_WD(irn, op, SDYN_NODE_RETURN);
-            i = GGC_RD(ir, length) - 1;
             GGC_WD(irn, left, i);
             SDyn_IRNodeListPush(ir, irn);
 
