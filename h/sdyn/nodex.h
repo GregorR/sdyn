@@ -96,6 +96,15 @@ SDYN_NODEX(UNIFY)           /* unify two values
                                l:value 1
                                r:value 2 */
 
+/* speculate that a value is of the given type. The type is given in the rtype
+ * field, as this operation both speculates on the type and evaluates to a
+ * value of the type. The input must be boxed, but the rtype may be unboxed, in
+ * which case unboxing will be performed at runtime. */
+SDYN_NODEX(SPECULATE)       /* l:value to speculate over */
+
+/* when a SPECULATE fails, it jumps to the associated SPECULATE_FAIL */
+SDYN_NODEX(SPECULATE_FAIL)  /* l:associated SPECULATE */
+
 /* with if loops, IF is the start, IFELSE is the else part, and IFEND ends
  * that. If no else clause, IFELSE is immediately followed by IFEND */
 SDYN_NODEX(IFELSE)

@@ -638,7 +638,7 @@ void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member,
     GGC_PUSH_4(object, member, members, tag);
 
     tag = (SDyn_Tag) GGC_RUP(object);
-    if (GGC_RD(tag, type) != SDYN_TYPE_OBJECT) return sdyn_undefined;
+    if (GGC_RD(tag, type) != SDYN_TYPE_OBJECT) return;
 
     idx = sdyn_getObjectMemberIndex(NULL, object, member, 1);
     members = GGC_RP(object, members);

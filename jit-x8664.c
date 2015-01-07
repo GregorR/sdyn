@@ -525,6 +525,117 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 C2(MOV, target, RAX);
                 break;
 
+            case SDYN_NODE_SPECULATE:
+                LOADOP(left, RSI);
+
+                /* we'll store our label address in imm. Set it to 0 for non-label cases */
+                GGC_WD(node, imm, 0);
+
+                /* first off, this is very silly if our input type is already right */
+                if (targetType == leftType) {
+                    C2(MOV, target, RSI);
+                    break;
+                }
+
+                /* or if they can't possibly match */
+                if (leftType != SDYN_TYPE_BOXED) {
+                    if ((leftType == SDYN_TYPE_BOXED_UNDEFINED) && (targetType == SDYN_TYPE_UNDEFINED)) {
+                        /* no unboxing required for undefined */
+
+                    } else if (((leftType == SDYN_TYPE_BOXED_BOOL) && (targetType == SDYN_TYPE_BOOL)) ||
+                               ((leftType == SDYN_TYPE_BOXED_INT) && (targetType == SDYN_TYPE_INT))) {
+                        /* unbox the value */
+                        C2(MOV, target, MEM(8, RSI, 0, RNONE, 8));
+
+                    } else if ((leftType == SDYN_TYPE_UNDEFINED) && (targetType == SDYN_TYPE_BOXED_UNDEFINED)) {
+                        /* box the undefined value */
+                        IMM64P(RAX, &sdyn_undefined);
+                        C2(MOV, target, MEM(8, RAX, 0, RNONE, 0));
+
+                    } else if ((leftType == SDYN_TYPE_BOOL) && (targetType == SDYN_TYPE_BOXED_BOOL)) {
+                        /* box the bool */
+                        IMM64P(RAX, sdyn_boxBool);
+                        JCALL(RAX);
+                        C2(MOV, target, RAX);
+
+                    } else if ((leftType == SDYN_TYPE_INT) && (targetType == SDYN_TYPE_BOXED_INT)) {
+                        /* box the int */
+                        IMM64P(RAX, sdyn_boxInt);
+                        JCALL(RAX);
+                        C2(MOV, target, RAX);
+
+                    } else {
+                        /* speculation can never succeed */
+                        size_t fail;
+                        CF(JMPF, fail);
+                        GGC_WD(node, imm, fail);
+
+                    }
+
+                    break;
+                }
+
+                /* our input is something boxed; check its type. The type tag is buried like so:
+                 * struct Value {
+                 *     struct Descriptor *d;
+                 *     ...
+                 * };
+                 * struct Descriptor {
+                 *     struct Descriptor *descriptorDescriptor;
+                 *     struct Tag *tag;
+                 *     ...
+                 * };
+                 * struct Tag {
+                 *     struct Descriptor *tagDescriptor;
+                 *     long tag;
+                 * };
+                 */
+                C2(MOV, RAX, MEM(8, RSI, 0, RNONE, 0)); /* get the descriptor */
+                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 8)); /* get the tag box */
+                C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 8)); /* get the tag */
+
+                /* now we check if the tag is what we expect */
+                {
+                    size_t expected = 0;
+                    switch (targetType) {
+                        case SDYN_TYPE_UNDEFINED:
+                            expected = SDYN_TYPE_BOXED_UNDEFINED;
+                            break;
+
+                        case SDYN_TYPE_BOOL:
+                            expected = SDYN_TYPE_BOXED_BOOL;
+                            break;
+
+                        case SDYN_TYPE_INT:
+                            expected = SDYN_TYPE_BOXED_INT;
+                            break;
+
+                        default:
+                            expected = targetType;
+                    }
+                    C2(CMP, RAX, IMM(expected));
+                }
+
+                /* if it's not, jump to the failed speculation */
+                {
+                    size_t fail;
+                    CF(JNEF, fail);
+                    GGC_WD(node, imm, fail);
+                }
+
+                break;
+
+            case SDYN_NODE_SPECULATE_FAIL:
+            {
+                /* our speculation failed. This is the label target for the associated SPECULATE */
+                size_t fail;
+                fail = GGC_RD(node, left);
+                onode = GGC_RAP(ir, fail);
+                fail = GGC_RD(onode, imm);
+                L(fail);
+                break;
+            }
+
             /* 0-ary: */
             case SDYN_NODE_TOP:
                 IMM64P(RAX, &sdyn_globalObject);
