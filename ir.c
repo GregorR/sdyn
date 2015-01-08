@@ -782,6 +782,122 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
     return GGC_RD(ir, length) - 1;
 }
 
+/* set up the uidxs for all nodes */
+static void irUidx(SDyn_IRNodeArray ir)
+{
+    SDyn_IRNode node = NULL, unode = NULL;
+    ssize_t si;
+    size_t idx, uidx;
+
+    GGC_PUSH_3(ir, node, unode);
+
+    /* first off, default uidxs */
+    for (si = ir->length - 1; si >= 0; si--) {
+        node = GGC_RAP(ir, si);
+        GGC_WD(node, uidx, si);
+    }
+
+    /* then unify */
+    for (si = ir->length - 1; si >= 0; si--) {
+        node = GGC_RAP(ir, si);
+
+        if (GGC_RD(node, op) == SDYN_NODE_UNIFY) {
+            idx = GGC_RD(node, uidx);
+            GGC_WD(node, rtype, SDYN_TYPE_BOXED);
+            unode = GGC_RAP(ir, GGC_RD(node, left));
+            GGC_WD(unode, uidx, idx);
+            unode = GGC_RAP(ir, GGC_RD(node, right));
+            GGC_WD(unode, uidx, idx);
+        }
+    }
+}
+
+/* flow IR types through operations */
+static void irFlowTypes(SDyn_IRNodeArray ir)
+{
+    SDyn_IRNode node = NULL, unode = NULL, onode = NULL;
+    int changed;
+    int leftType, rightType, thirdType, origTargetType, targetType;
+    size_t i, uidx;
+
+    GGC_PUSH_4(ir, node, unode, onode);
+
+    do {
+        changed = 0;
+        for (i = 0; i < ir->length; i++) {
+            /* get the node and its unification target */
+            node = GGC_RAP(ir, i);
+            unode = node;
+            uidx = i;
+            while (GGC_RD(unode, uidx) != uidx) {
+                uidx = GGC_RD(unode, uidx);
+                unode = GGC_RAP(ir, uidx);
+            }
+            targetType = GGC_RD(unode, rtype);
+
+            /* get all its operands */
+#define OPTYPE(op) do { \
+    uidx = GGC_RD(node, op); \
+    onode = GGC_RAP(ir, uidx); \
+    while (GGC_RD(onode, uidx) != uidx) { \
+        uidx = GGC_RD(onode, uidx); \
+        onode = GGC_RAP(ir, uidx); \
+    } \
+    op ## Type = GGC_RD(onode, rtype); \
+} while(0)
+            OPTYPE(left);
+            OPTYPE(right);
+            OPTYPE(third);
+#undef OPTYPE
+            origTargetType = targetType = GGC_RD(node, rtype);
+
+            /* then choose the result type */
+            switch (GGC_RD(node, op)) {
+                case SDYN_NODE_ASSIGN:
+                    /* just an alias */
+                    targetType = leftType;
+                    break;
+
+                case SDYN_NODE_ADD:
+                    /* in some specific cases, we can predict the result type */
+                    if ((leftType == SDYN_TYPE_INT || leftType == SDYN_TYPE_BOXED_INT) &&
+                            (rightType == SDYN_TYPE_INT || rightType == SDYN_TYPE_BOXED_INT)) {
+                        /* both ints, result is int */
+                        targetType = SDYN_TYPE_INT;
+
+                    } else if (leftType != SDYN_TYPE_BOXED && rightType != SDYN_TYPE_BOXED) {
+                        /* both types are known, but they're not both ints, so the result is a string */
+                        targetType = SDYN_TYPE_STRING;
+
+                    }
+                    break;
+
+                case SDYN_NODE_UNIFY:
+                    /* if both sides are the same type, then the unification needn't be blind boxing */
+                    if (leftType == rightType) {
+                        targetType = leftType;
+
+                    } else if ((leftType == SDYN_TYPE_BOOL && rightType == SDYN_TYPE_BOXED_BOOL) ||
+                            (leftType == SDYN_TYPE_BOXED_BOOL && rightType == SDYN_TYPE_BOOL)) {
+                        targetType = SDYN_TYPE_BOXED_BOOL;
+
+                    } else if ((leftType == SDYN_TYPE_INT && rightType == SDYN_TYPE_BOXED_INT) ||
+                            (leftType == SDYN_TYPE_BOXED_INT && rightType == SDYN_TYPE_INT)) {
+                        targetType = SDYN_TYPE_BOXED_INT;
+
+                    }
+                    break;
+            }
+
+            if (origTargetType != targetType) {
+                /* we chose a more precise type */
+                GGC_WD(node, rtype, targetType);
+                changed = 1;
+            }
+        }
+    } while(changed);
+}
+
 /* compile a function to IR */
 SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func)
 {
@@ -799,6 +915,10 @@ SDyn_IRNodeArray sdyn_irCompilePrime(SDyn_Node func)
     /* convert to array */
     ret = SDyn_IRNodeListToArray(ir);
 
+    /* do type propagation */
+    irUidx(ret);
+    irFlowTypes(ret);
+
     return ret;
 }
 
@@ -815,14 +935,6 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
 
     GGC_PUSH_8(ir, node, unode, callNode, stksUsed, pstksUsed, irUsed, lastUsed);
 
-    /* first off, default uidxs */
-    irUsed = GGC_NEW_DA(char, ir->length);
-    for (si = ir->length - 1; si >= 0; si--) {
-        li = 0;
-        node = GGC_RAP(ir, si);
-        GGC_WD(node, uidx, si);
-    }
-
 #define USED(v) do { \
     size_t vv = (v); \
     unode = GGC_RAP(ir, vv); \
@@ -833,6 +945,8 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
         GGC_WAD(irUsed, idx, 1); \
     } \
 } while(0)
+
+    irUsed = GGC_NEW_DA(char, ir->length);
 
     /* then perform last-use analysis */
     for (si = ir->length - 1; si >= 0; si--) {
@@ -846,18 +960,6 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
 
         /* handle special cases */
         switch (GGC_RD(node, op)) {
-            case SDYN_NODE_UNIFY:
-                /* set the uidx on both unified nodes, and force them to box in case their types differ */
-                idx = GGC_RD(node, uidx);
-                GGC_WD(node, rtype, SDYN_TYPE_BOXED);
-                unode = GGC_RAP(ir, GGC_RD(node, left));
-                GGC_WD(unode, uidx, idx);
-                GGC_WD(unode, rtype, SDYN_TYPE_BOXED);
-                unode = GGC_RAP(ir, GGC_RD(node, right));
-                GGC_WD(unode, uidx, idx);
-                GGC_WD(unode, rtype, SDYN_TYPE_BOXED);
-                break;
-
             case SDYN_NODE_CALL:
             case SDYN_NODE_INTRINSICCALL:
                 /* calls need to associate all their args, but to do that, we'll need to wait 'til the last arg */

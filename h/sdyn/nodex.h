@@ -44,13 +44,13 @@ SDYN_NODEX(WHILE)       /*  - [Expression, Statements]
                                                     just marks the beginning of
                                                     a loop */
 SDYN_NODEX(RETURN)      /*  - [Expression]          l:Expression    */
-SDYN_NODEX(ASSIGN)      /*  - [LVal, Expression]    unused          */
+SDYN_NODEX(ASSIGN)      /*  - [LVal, Expression]    l:value (just a mov, really) */
 
 /* BINARY EXPRESSIONS:      - [Left expression, Right expression]
  *                                                  l:Left expression
  *                                                  r:Right expression */
-SDYN_NODEX(OR)
-SDYN_NODEX(AND)
+SDYN_NODEX(OR)                                  /*  IR unused */
+SDYN_NODEX(AND)                                 /*  IR unused */
 SDYN_NODEX(EQ)
 SDYN_NODEX(NE)
 SDYN_NODEX(LT)
