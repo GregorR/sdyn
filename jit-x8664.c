@@ -436,6 +436,13 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
 
+                if (leftType != SDYN_TYPE_OBJECT) {
+                    /* coerce it */
+                    IMM64P(RAX, sdyn_toObject);
+                    JCALL(RAX);
+                    C2(MOV, RSI, RAX);
+                }
+
                 /* put the string member name somewhere to load at runtime */
                 gstring = (SDyn_String *) createPointer();
                 *gstring = GGC_RP(node, immp);
@@ -456,6 +463,14 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
                 LOADOP(left, RAX);
                 BOX(leftType, RSI, left);
+
+                if (leftType != SDYN_TYPE_OBJECT) {
+                    /* coerce it */
+                    IMM64P(RAX, sdyn_toObject);
+                    JCALL(RAX);
+                    C2(MOV, RSI, RAX);
+                }
+
                 C2(MOV, MEM(8, RDI, 0, RNONE, 0), RSI);
 
                 LOADOP(right, RAX);

@@ -473,6 +473,21 @@ SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value)
     return ret;
 }
 
+/* coerce to object (not valid in any meaningful sense, so only required for member access) */
+SDyn_Object sdyn_toObject(void **pstack, SDyn_Undefined value)
+{
+    SDyn_Tag tag = NULL;
+
+    PSTACK();
+    GGC_PUSH_2(value, tag);
+
+    tag = (SDyn_Tag) GGC_RUP(value);
+    if (GGC_RD(tag, type) == SDYN_TYPE_OBJECT) return (SDyn_Object) value;
+
+    /* it's not an object, so just give nonsense */
+    return sdyn_newObject(NULL);
+}
+
 /* convert to either a string or a number, with preference towards string */
 SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value)
 {
@@ -609,15 +624,10 @@ size_t sdyn_getObjectMemberIndex(void **pstack, SDyn_Object object, SDyn_String 
 SDyn_Undefined sdyn_getObjectMember(void **pstack, SDyn_Object object, SDyn_String member)
 {
     SDyn_Undefined ret = NULL;
-    SDyn_Tag tag = NULL;
     size_t idx;
 
     PSTACK();
-    GGC_PUSH_4(object, member, ret, tag);
-
-    /* assert that it IS an object */
-    tag = (SDyn_Tag) GGC_RUP(object);
-    if (GGC_RD(tag, type) != SDYN_TYPE_OBJECT) return sdyn_undefined;
+    GGC_PUSH_3(object, member, ret);
 
     /* then get the member */
     if ((idx = sdyn_getObjectMemberIndex(NULL, object, member, 0)) != (size_t) -1) {
@@ -631,14 +641,10 @@ SDyn_Undefined sdyn_getObjectMember(void **pstack, SDyn_Object object, SDyn_Stri
 void sdyn_setObjectMember(void **pstack, SDyn_Object object, SDyn_String member, SDyn_Undefined value)
 {
     SDyn_UndefinedArray members = NULL;
-    SDyn_Tag tag = NULL;
     size_t idx;
 
     PSTACK();
-    GGC_PUSH_4(object, member, members, tag);
-
-    tag = (SDyn_Tag) GGC_RUP(object);
-    if (GGC_RD(tag, type) != SDYN_TYPE_OBJECT) return;
+    GGC_PUSH_3(object, member, members);
 
     idx = sdyn_getObjectMemberIndex(NULL, object, member, 1);
     members = GGC_RP(object, members);

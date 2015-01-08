@@ -869,6 +869,11 @@ static void irFlowTypes(SDyn_IRNodeArray ir)
                         /* both types are known, but they're not both ints, so the result is a string */
                         targetType = SDYN_TYPE_STRING;
 
+                    } else if ((leftType == SDYN_TYPE_BOXED && rightType != SDYN_TYPE_INT && rightType != SDYN_TYPE_BOXED_INT) ||
+                               (rightType == SDYN_TYPE_BOXED && leftType != SDYN_TYPE_INT && rightType != SDYN_TYPE_BOXED_INT)) {
+                        /* one side or the other is not an int, so the result must be a string */
+                        targetType = SDYN_TYPE_STRING;
+
                     }
                     break;
 

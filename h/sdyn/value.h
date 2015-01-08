@@ -149,6 +149,7 @@ SDyn_String sdyn_unquote(SDyn_String istr);
 int sdyn_toBoolean(void **pstack, SDyn_Undefined value);
 long sdyn_toNumber(void **pstack, SDyn_Undefined value);
 SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value);
+SDyn_Object sdyn_toObject(void **pstack, SDyn_Undefined value);
 SDyn_Undefined sdyn_toValue(void **pstack, SDyn_Undefined value);
 
 /* assertions */
