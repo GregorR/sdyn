@@ -704,6 +704,10 @@ static void dumpNode(size_t spcs, SDyn_Node node)
     GGC_PUSH_2(node, children);
 
     for (i = 0; i < spcs; i++) printf("  ");
+    if (!node) {
+        printf("NULL\n");
+        return;
+    }
     printf("%s: %.*s\n", sdyn_nodeNames[GGC_RD(node, type)], (int) GGC_RD(node, tok).valLen, (char *) GGC_RD(node, tok).val);
 
     spcs++;
