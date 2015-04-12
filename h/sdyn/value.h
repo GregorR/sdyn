@@ -76,8 +76,8 @@ GGC_END_TYPE(SDyn_String,
     );
 
 /* object shape */
-typedef struct SDyn_ShapeMap__struct *SDyn_ShapeMap_;
-typedef struct SDyn_IndexMap__struct *SDyn_IndexMap_;
+typedef struct SDyn_ShapeMap__ggggc_struct *SDyn_ShapeMap_;
+typedef struct SDyn_IndexMap__ggggc_struct *SDyn_IndexMap_;
 GGC_TYPE(SDyn_Shape)
     GGC_MDATA(size_t, size);
     GGC_MPTR(SDyn_ShapeMap_, children);
@@ -88,11 +88,13 @@ GGC_END_TYPE(SDyn_Shape,
     );
 
 /* map of strings to object shapes */
-GGC_MAP_DECL(SDyn_ShapeMap, SDyn_String, SDyn_Shape);
+size_t SDyn_ShapeMapStringHash(SDyn_String str);
+int SDyn_ShapeMapStringCmp(SDyn_String strl, SDyn_String strr);
+GGC_MAP(SDyn_ShapeMap, SDyn_String, SDyn_Shape, SDyn_ShapeMapStringHash, SDyn_ShapeMapStringCmp);
 
 /* map of strings to indexes (size_ts) */
 GGC_UNIT(size_t)
-GGC_MAP_DECL(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit);
+GGC_MAP(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit, SDyn_ShapeMapStringHash, SDyn_ShapeMapStringCmp);
 
 /* object */
 GGC_TYPE(SDyn_Object)

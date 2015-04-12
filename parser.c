@@ -67,7 +67,7 @@ char *sdyn_nodeNames[] = {
     GGC_WP(ret, children, childrenv); \
 } while(0)
 
-GGC_LIST_STATIC(SDyn_Node)
+GGC_LIST(SDyn_Node)
 
 #define PARSER(name) static SDyn_Node parse ## name (struct SDyn_Token *ntok)
 PARSER(Top);

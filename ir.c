@@ -52,7 +52,7 @@
 #include "sdyn/ir.h"
 #include "sdyn/value.h"
 
-GGC_LIST_STATIC(SDyn_IRNode)
+GGC_LIST(SDyn_IRNode)
 
 /* utility function to clone a symbol table */
 static SDyn_IndexMap cloneSymbolTable(SDyn_IndexMap symbols)
@@ -65,14 +65,7 @@ static SDyn_IndexMap cloneSymbolTable(SDyn_IndexMap symbols)
     GGC_PUSH_4(symbols, symbols2, name, indexBox);
 
     /* we'll need to compare our symbol table before and after to unify, so first, copy */
-    symbols2 = GGC_NEW(SDyn_IndexMap);
-    for (i = 0; i < GGC_RD(symbols, size); i++) {
-        name = GGC_RAP(GGC_RP(symbols, keys), i);
-        if (name) {
-            indexBox = GGC_RAP(GGC_RP(symbols, values), i);
-            SDyn_IndexMapPut(symbols2, name, indexBox);
-        }
-    }
+    symbols2 = SDyn_IndexMapClone(symbols);
 
     return symbols2;
 }
@@ -80,19 +73,21 @@ static SDyn_IndexMap cloneSymbolTable(SDyn_IndexMap symbols)
 /* utility function to unify symbol tables */
 static void unifySymbolTables(SDyn_IRNodeList ir, SDyn_IndexMap symbols, SDyn_IndexMap symbols2, int loop)
 {
+    SDyn_IndexMapEntry entry = NULL;
     SDyn_IRNode irn = NULL;
     SDyn_String name = NULL;
     GGC_size_t_Unit indexBox = NULL, indexBox2 = NULL;
     size_t i;
 
-    GGC_PUSH_7(ir, symbols, symbols2, irn, name, indexBox, indexBox2);
+    GGC_PUSH_8(ir, symbols, symbols2, entry, irn, name, indexBox, indexBox2);
 
     /* go through each symbol */
     for (i = 0; i < GGC_RD(symbols2, size); i++) {
-        name = GGC_RAP(GGC_RP(symbols2, keys), i);
-        if (name) {
+        entry = GGC_RAP(GGC_RP(symbols2, entries), i);
+        while (entry) {
             size_t idx;
-            indexBox2 = GGC_RAP(GGC_RP(symbols2, values), i);
+            name = GGC_RP(entry, key);
+            indexBox2 = GGC_RP(entry, value);
             idx = GGC_RD(indexBox2, v);
             if (SDyn_IndexMapGet(symbols, name, &indexBox)) {
                 if (indexBox != indexBox2) {
@@ -125,6 +120,8 @@ static void unifySymbolTables(SDyn_IRNodeList ir, SDyn_IndexMap symbols, SDyn_In
                 GGC_WD(irn, left, idx);
                 SDyn_IRNodeListPush(ir, irn);
             }
+
+            entry = GGC_RP(entry, next);
         }
     }
 

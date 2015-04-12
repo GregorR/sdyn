@@ -29,7 +29,7 @@
 #include "sdyn/value.h"
 
 /* map functions */
-static size_t stringHash(SDyn_String str)
+size_t SDyn_ShapeMapStringHash(SDyn_String str)
 {
     GGC_char_Array arr = NULL;
     size_t i, ret = 0;
@@ -43,7 +43,7 @@ static size_t stringHash(SDyn_String str)
     return ret;
 }
 
-static int stringCmp(SDyn_String strl, SDyn_String strr)
+int SDyn_ShapeMapStringCmp(SDyn_String strl, SDyn_String strr)
 {
     GGC_char_Array arrl = NULL, arrr = NULL;
     size_t lenl, lenr, minlen;
@@ -68,10 +68,6 @@ static int stringCmp(SDyn_String strl, SDyn_String strr)
 
     return ret;
 }
-
-/* map definitions */
-GGC_MAP_DEFN(SDyn_ShapeMap, SDyn_String, SDyn_Shape, stringHash, stringCmp);
-GGC_MAP_DEFN(SDyn_IndexMap, SDyn_String, GGC_size_t_Unit, stringHash, stringCmp);
 
 /* important global values */
 SDyn_Undefined sdyn_undefined = NULL;

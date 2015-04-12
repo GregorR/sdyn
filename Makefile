@@ -34,8 +34,11 @@ sdyn: $(OBJS) main.o $(LLIBS)
 test-%: $(OBJS) %-test.o $(LLIBS)
 	$(CC) $(CFLAGS) $(filter-out $*.o,$(OBJS)) $*-test.o $(LIBS) -o $@
 
-ggggc/libggggc.a:
+ggggc/libggggc.a: ggggc/ggggc/gc.h
 	cd ggggc ; $(MAKE)
+
+ggggc/ggggc/gc.h:
+	cd ggggc-unpatched ; $(MAKE) patch PATCHES=jitpstack
 
 smalljitasm/libsmalljitasm.a:
 	cd smalljitasm ; $(MAKE)
@@ -47,16 +50,16 @@ test: sdyn
 	    diff -u tests/results/$$i tests/correct/$$i || break; \
 	done
 
-%.o: %.c
+%.o: %.c ggggc/ggggc/gc.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%-test.o: %.c
+%-test.o: %.c ggggc/ggggc/gc.h
 	$(CC) $(CFLAGS) -DUSE_SDYN_`echo "$*" | tr '[a-z]' '[A-Z]'`_TEST -c $*.c -o $*-test.o
 
 clean:
 	rm -f sdyn $(EXTRAS) *.o deps
 	rm -rf tests/results
-	cd ggggc ; $(MAKE) clean
+	rm -rf ggggc
 	cd smalljitasm ; $(MAKE) clean
 
 include deps
