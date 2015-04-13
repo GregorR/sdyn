@@ -65,4 +65,4 @@ clean:
 include deps
 
 deps:
-	-$(CC) -Ih -Iggggc -Ismalljitasm -MM *.c > deps
+	-$(CC) -Ih -Iggggc -Iggggc-unpatched -Ismalljitasm -MM *.c > deps
