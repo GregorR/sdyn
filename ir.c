@@ -686,6 +686,7 @@ static size_t irCompileNode(SDyn_IRNodeList ir, SDyn_Node node, SDyn_IndexMap sy
             if (GGC_RD(node, type) == SDYN_NODE_OR) {
                 irn = GGC_NEW(SDyn_IRNode);
                 GGC_WD(irn, op, SDYN_NODE_NOT);
+                GGC_WD(irn, rtype, SDYN_TYPE_BOOL);
                 GGC_WD(irn, left, cond1);
                 cond1n = GGC_RD(ir, length);
                 SDyn_IRNodeListPush(ir, irn);

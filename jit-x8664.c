@@ -692,8 +692,9 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             case SDYN_NODE_FALSE:
                 if (targetType >= SDYN_TYPE_FIRST_BOXED) {
-                    IMM64P(target, &sdyn_false);
-                    C2(MOV, target, MEM(8, target, 0, RNONE, 0));
+                    IMM64P(RAX, &sdyn_false);
+                    C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+                    C2(MOV, target, RAX);
                 } else {
                     IMM64(target, 0);
                 }
@@ -701,8 +702,9 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
 
             case SDYN_NODE_TRUE:
                 if (targetType >= SDYN_TYPE_FIRST_BOXED) {
-                    IMM64P(target, &sdyn_true);
-                    C2(MOV, target, MEM(8, target, 0, RNONE, 0));
+                    IMM64P(RAX, &sdyn_true);
+                    C2(MOV, RAX, MEM(8, RAX, 0, RNONE, 0));
+                    C2(MOV, target, RAX);
                 } else {
                     IMM64(target, 1);
                 }
