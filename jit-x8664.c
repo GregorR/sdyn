@@ -108,6 +108,10 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
     size_t imm64 = (v); \
     if (imm64 < 0x100000000L) { \
         C2(MOV, o1, IMM(imm64)); \
+    } else if (imm64 & 0x80000000L) { \
+        C2(MOV, o1, IMM((~imm64)>>32)); \
+        C2(SHL, o1, IMM(32)); \
+        C2(XOR, o1, IMM(imm64&0xFFFFFFFFL)); \
     } else { \
         C2(MOV, o1, IMM(imm64>>32)); \
         C2(SHL, o1, IMM(32)); \
