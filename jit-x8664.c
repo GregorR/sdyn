@@ -1,7 +1,7 @@
 /*
  * SDyn: JIT for x86_64. Architecture conventions are described below.
  *
- * Copyright (c) 2015 Gregor Richards
+ * Copyright (c) 2015, 2019 Gregor Richards
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
