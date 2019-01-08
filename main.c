@@ -24,6 +24,7 @@
 
 #include "sja/buffer.h"
 
+#include "sdyn/exec.h"
 #include "sdyn/jit.h"
 
 int main(int argc, char **argv)
