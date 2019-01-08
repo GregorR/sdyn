@@ -21,7 +21,7 @@
  *
  *  By the Unix calling convention, the first four arguments go in RDI, RSI,
  *  RDX, RCX, the return goes in RAX, RSP is the stack pointer and RBP is the
- *  frame pointer. We use ONLY these registers. RSP must be 16-bit aligned.
+ *  frame pointer. We use ONLY these registers. RSP must be 16-byte aligned.
  *
  *  RDI is used as the second (collected pointer) stack. RDI will never be
  *  overwritten by a JIT function, but MAY be overwritten by a normal function,
@@ -210,7 +210,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             case SDYN_NODE_ALLOCA:
                 imm = GGC_RD(node, imm) + 2; /* 2 extra slots for temporaries */
                 /* must align stack to 16 by Unix calling conventions */
-                if ((imm % 2) == 0) imm++;
+                if ((imm % 2) != 0) imm++;
                 /* 8 bytes per word */
                 imm *= 8;
 
@@ -240,7 +240,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
             case SDYN_NODE_POPA:
                 imm = GGC_RD(node, imm) + 2;
                 /* must align stack to 16 */
-                if ((imm % 2) == 0) imm++;
+                if ((imm % 2) != 0) imm++;
                 imm *= 8;
                 C2(ADD, RSP, IMM(imm));
                 C1(POP, RBP);
