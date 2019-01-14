@@ -408,27 +408,33 @@ SDyn_String sdyn_toString(void **pstack, SDyn_Undefined value)
         case SDYN_TYPE_BOXED_INT:
         {
             size_t len;
-            long val;
+            long val, tmp;
+            int negative;
             number = (SDyn_Number) value;
 
             /* first determine the necessary length */
             val = GGC_RD(number, value);
-            if (val < 0) len = 1;
-            else len = 0;
+            negative = (val<0);
+            if (negative) {
+                val *= -1;
+                len = 1;
+            } else {
+                len = 0;
+            }
+            tmp = val;
             if (val == 0) len++;
-            else for (; val; len++) val /= 10;
+            else for (; tmp; len++) tmp /= 10;
 
             /* now allocate that length */
             ca = GGC_NEW_DA(char, len);
 
             /* and convert */
-            val = GGC_RD(number, value);
             for (len--; len > 0; len--) {
                 char c = (val % 10) + '0';
                 GGC_WAD(ca, len, c);
                 val /= 10;
             }
-            if (GGC_RD(number, value) < 0) {
+            if (negative) {
                 char c = '-';
                 GGC_WAD(ca, 0, c);
             } else {
