@@ -856,6 +856,16 @@ static void irFlowTypes(SDyn_IRNodeArray ir)
                     targetType = leftType;
                     break;
 
+                case SDYN_NODE_ASSIGNMEMBER:
+                    /* alias with an assignment */
+                    targetType = rightType;
+                    break;
+
+                case SDYN_NODE_ASSIGNINDEX:
+                    /* alias with an index */
+                    targetType = thirdType;
+                    break;
+
                 case SDYN_NODE_ADD:
                     /* in some specific cases, we can predict the result type */
                     if ((leftType == SDYN_TYPE_INT || leftType == SDYN_TYPE_BOXED_INT) &&
@@ -1024,6 +1034,10 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
         node = GGC_RAP(ir, si);
         idx = GGC_RD(node, uidx);
         unode = GGC_RAP(ir, idx);
+        while (GGC_RD(unode, uidx) != idx) {
+            idx = GGC_RD(unode, uidx);
+            unode = GGC_RAP(ir, idx);
+        }
 
         /* special cases */
         if (GGC_RD(node, op) == SDYN_NODE_ARG) {
@@ -1050,7 +1064,7 @@ void sdyn_irRegAlloc(SDyn_IRNodeArray ir, struct SDyn_RegisterMap *registerMap)
         }
 
         /* does it need to go on the pointer stack? */
-        if (GGC_RD(node, rtype) >= SDYN_TYPE_FIRST_BOXED) {
+        if (GGC_RD(unode, rtype) >= SDYN_TYPE_FIRST_BOXED) {
             stype = SDYN_STORAGE_PSTK;
             cstksUsed = &pstksUsed;
             cstkUsed = &pstkUsed;

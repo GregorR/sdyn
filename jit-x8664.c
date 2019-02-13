@@ -144,8 +144,12 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
         /* macro to load an operand (left, right, third) into a register */
 #define LOADOP(opa, defreg) do { \
     if (GGC_RD(node, opa)) { \
-        onode = GGC_RAP(ir, GGC_RD(node, opa)); \
-        onode = GGC_RAP(ir, GGC_RD(onode, uidx)); \
+        uidx = GGC_RD(node, opa); \
+        onode = GGC_RAP(ir, uidx); \
+        while (GGC_RD(onode, uidx) != uidx) { \
+            uidx = GGC_RD(onode, uidx); \
+            onode = GGC_RAP(ir, uidx); \
+        } \
         opa ## Type = GGC_RD(onode, rtype); \
         if (GGC_RD(onode, stype) == SDYN_STORAGE_PSTK) { \
             opa = defreg; \
@@ -491,6 +495,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 IMM64P(RAX, sdyn_setObjectMember);
                 JCALL(RAX);
 
+                LOADOP(right, RAX);
                 C2(MOV, target, RAX);
                 break;
             }
@@ -541,6 +546,7 @@ sdyn_native_function_t sdyn_compile(SDyn_IRNodeArray ir)
                 IMM64P(RAX, sdyn_setObjectMember);
                 JCALL(RAX);
 
+                LOADOP(third, RAX);
                 C2(MOV, target, RAX);
                 break;
 
