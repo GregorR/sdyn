@@ -1,0 +1,50 @@
+function binsearch(arr, val, from, to) {
+    var s;
+    var av;
+    if (from == to) {
+        s = from;
+        while (s > 0 && arr[s] > val) {
+            s = s - 1;
+        }
+        return s;
+    }
+    s = from + ~~((to - from) / 2);
+    av = arr[s];
+    if (av > val) {
+        return binsearch(arr, val, from, s);
+    } else {
+        if (av < val) {
+            return binsearch(arr, val, s + 1, to);
+        } else {
+            return s;
+        }
+    }
+}
+
+function doit() {
+    var arr;
+    arr = {};
+    arr.length = 10;
+    arr[0] = 5;
+    arr[1] = 7;
+    arr[2] = 42;
+    arr[3] = 45;
+    arr[4] = 60;
+    arr[5] = 123;
+    arr[6] = 1234;
+    arr[7] = 4000;
+    arr[8] = 4222;
+    arr[9] = 10000;
+    binsearch(arr, 64, 0, arr.length);
+}
+
+function main() {
+    var i;
+    i = 0;
+    while (i < 1000000) {
+        doit();
+        i = i + 2;
+    }
+}
+
+main();
