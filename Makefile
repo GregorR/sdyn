@@ -59,8 +59,11 @@ test: sdyn
 clean:
 	rm -f sdyn $(EXTRAS) *.o deps
 	rm -rf tests/results
-	rm -rf ggggc
+	cd ggggc ; $(MAKE) clean
 	cd smalljitasm ; $(MAKE) clean
+
+distclean: clean
+	rm -rf ggggc
 
 include deps
 
